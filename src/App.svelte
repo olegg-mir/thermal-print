@@ -43,6 +43,7 @@
     null;
 
   $: t = strings[workspace.language];
+  $: if (typeof document !== 'undefined') document.documentElement.lang = workspace.language;
   $: selectedTemplate =
     workspace.templates.find((item) => item.id === workspace.selectedTemplateId) ??
     workspace.templates[0];
