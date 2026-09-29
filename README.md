@@ -33,7 +33,7 @@ Thermal Print хранит данные в конкретном браузере
 
 ## Разработка
 
-Нужны Node.js 20+ и npm.
+Нужны Node.js 24 и npm.
 
 ```sh
 npm ci
