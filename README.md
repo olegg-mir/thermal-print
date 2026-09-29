@@ -66,6 +66,8 @@ npm run build
 - [Material Web](https://github.com/material-components/material-web) — компоненты Material Design 3, Apache-2.0.
 - [Noto Sans](https://github.com/notofonts/latin-greek-cyrillic) и [Noto Serif](https://github.com/notofonts/latin-greek-cyrillic) — шрифты под SIL Open Font License.
 
+Тексты лицензий включённых компонентов находятся в [public/licenses](public/licenses).
+
 Лицензия Thermal Print: [MIT](LICENSE).
 
 ## English
