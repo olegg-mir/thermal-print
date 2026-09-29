@@ -39,6 +39,7 @@
   let previewCanvas: HTMLCanvasElement;
   let importInput: HTMLInputElement;
   let saveTimer: ReturnType<typeof setTimeout>;
+  const readyFonts = new Set<string>();
   let dragging: { pointerId: number; startX: number; startY: number; x: number; y: number } | null =
     null;
 
@@ -59,7 +60,25 @@
     workspace.language;
     selectedElementId;
     previewCanvas;
-    void tick().then(drawPreview);
+    void tick().then(() => {
+      drawPreview();
+      if (
+        activeTemplate &&
+        activeTemplate.elements.some((element) => !readyFonts.has(fontSpec(element)))
+      ) {
+        void ensureFonts(activeTemplate).then(drawPreview);
+      }
+    });
+  }
+
+  function fontSpec(element: LabelElement): string {
+    return `${element.style.bold ? 700 : 400} ${element.style.fontSize}px "${element.style.fontFamily}"`;
+  }
+
+  async function ensureFonts(template: LabelTemplate): Promise<void> {
+    const specs = [...new Set(template.elements.map(fontSpec))];
+    await Promise.all(specs.map((spec) => document.fonts.load(spec, 'Продукт Product 0123456789')));
+    specs.forEach((spec) => readyFonts.add(spec));
   }
 
   onMount(() => {
@@ -270,7 +289,7 @@
     message = '';
     progress = 0;
     try {
-      await document.fonts.ready;
+      await ensureFonts(template);
       const rows = canvasToRows(renderLabel(template, product, freshNow, workspace.language));
       await printer.print(rows, workspace.printer, count);
       message = t.printDone;
