@@ -1,6 +1,18 @@
 export type Language = 'ru' | 'en';
-export type Frame = 'none' | 'classic' | 'jar' | 'container' | 'bag' | 'leaves' | 'dots';
-export type FontFamily = 'Noto Sans' | 'Noto Serif' | 'monospace';
+export type Frame =
+  | 'none'
+  | 'classic'
+  | 'jar'
+  | 'container'
+  | 'bag'
+  | 'leaves'
+  | 'dots'
+  | 'bottle'
+  | 'freezer'
+  | 'ribbon';
+export type FontFamily =
+  'Noto Sans' | 'Noto Serif' | 'Roboto Condensed' | 'Montserrat' | 'Caveat' | 'monospace';
+export type Theme = 'light' | 'dark' | 'system';
 export type Align = 'left' | 'center' | 'right';
 export type DateFormat = 'short' | 'shortYear' | 'iso' | 'long';
 
@@ -28,6 +40,7 @@ export interface StaticElement extends BaseElement {
 }
 export interface DateElement extends BaseElement {
   type: 'date';
+  source?: 'today' | 'expiry';
   prefix: string;
   format: DateFormat;
   offsetDays: number;
@@ -57,6 +70,7 @@ export interface PrinterSettings {
 export interface Workspace {
   version: 1;
   language: Language;
+  theme: Theme;
   selectedTemplateId: string;
   templates: LabelTemplate[];
   printer: PrinterSettings;
@@ -113,6 +127,7 @@ export function initialWorkspace(): Workspace {
   return {
     version: 1,
     language: 'ru',
+    theme: 'light',
     selectedTemplateId: template.id,
     templates: [template],
     printer: { ...defaultPrinterSettings },

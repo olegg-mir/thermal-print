@@ -10,6 +10,9 @@ Thermal Print is a static Svelte 5 + TypeScript + Vite PWA. GitHub Pages serves 
 - All label coordinates are printer dots. Width is fixed at 384 dots; height is configurable in multiples of 8 dots (8 dots/mm).
 - `renderLabel` is the single rendering path for on-screen preview and print raster. Avoid creating a second layout implementation.
 - Dynamic dates use the device's local calendar date at print time. Calendar years/months clamp to month end; days are applied after.
+- Quick-print shelf life is ephemeral UI state. `withExpiry` resolves positioned expiry date fields or adds a 56-dot extension to old templates. Recompute it with a fresh `Date` immediately before sending the job.
+- Editor preview uses the sample product name, independently of the quick-print input. Do not leak quick-print text into saved templates.
+- Theme is an additive field in version 1 backups; missing theme values load as light. Keep old backup imports working.
 - Validate imports before writing IndexedDB. Exports are user data; do not overwrite them during development.
 
 ## Printer safety and tests

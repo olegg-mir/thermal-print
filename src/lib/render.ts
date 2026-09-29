@@ -136,6 +136,37 @@ function drawFrame(ctx: CanvasRenderingContext2D, template: LabelTemplate): void
         ctx.arc(x, y, 1.6, 0, Math.PI * 2);
         ctx.fill();
       }
+  } else if (template.frame === 'bottle') {
+    rounded(ctx, 21, 48, 342, h - 62, 44);
+    rounded(ctx, 111, 24, 162, 30, 8);
+    rounded(ctx, 122, 11, 140, 16, 4);
+  } else if (template.frame === 'freezer') {
+    rounded(ctx, 12, 12, 360, h - 24, 17);
+    for (const x of [39, 345]) {
+      for (const y of [40, h - 40]) {
+        for (let angle = 0; angle < Math.PI; angle += Math.PI / 3) {
+          const dx = Math.cos(angle) * 12;
+          const dy = Math.sin(angle) * 12;
+          ctx.beginPath();
+          ctx.moveTo(x - dx, y - dy);
+          ctx.lineTo(x + dx, y + dy);
+          ctx.stroke();
+        }
+      }
+    }
+  } else if (template.frame === 'ribbon') {
+    rounded(ctx, 15, 14, 354, h - 28, 9);
+    ctx.lineWidth = 1;
+    rounded(ctx, 22, 21, 340, h - 42, 6);
+    for (const x of [48, 336]) {
+      for (const y of [42, h - 42]) {
+        ctx.beginPath();
+        ctx.moveTo(x - 9, y);
+        ctx.lineTo(x, y + 7);
+        ctx.lineTo(x + 9, y);
+        ctx.stroke();
+      }
+    }
   }
 }
 

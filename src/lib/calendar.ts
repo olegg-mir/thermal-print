@@ -29,7 +29,14 @@ export function formatDate(date: Date, format: DateElement['format'], language: 
 }
 
 export function dateElementText(element: DateElement, now: Date, language: Language): string {
-  const date = shiftedLocalDate(now, element.offsetYears, element.offsetMonths, element.offsetDays);
+  // The editor uses a seven-day example. Quick print replaces expiry fields with the real date.
+  const base = element.source === 'expiry' ? shiftedLocalDate(now, 0, 0, 7) : now;
+  const date = shiftedLocalDate(
+    base,
+    element.offsetYears,
+    element.offsetMonths,
+    element.offsetDays,
+  );
   return `${element.prefix}${formatDate(date, element.format, language)}`;
 }
 

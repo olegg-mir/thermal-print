@@ -53,8 +53,19 @@ function object(value: unknown): value is Record<string, unknown> {
 function number(value: unknown, min: number, max: number): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 }
-const frames = ['none', 'classic', 'jar', 'container', 'bag', 'leaves', 'dots'];
-const fonts = ['Noto Sans', 'Noto Serif', 'monospace'];
+const frames = [
+  'none',
+  'classic',
+  'jar',
+  'container',
+  'bag',
+  'leaves',
+  'dots',
+  'bottle',
+  'freezer',
+  'ribbon',
+];
+const fonts = ['Noto Sans', 'Noto Serif', 'Roboto Condensed', 'Montserrat', 'Caveat', 'monospace'];
 const aligns = ['left', 'center', 'right'];
 const formats = ['short', 'shortYear', 'iso', 'long'];
 
@@ -65,6 +76,7 @@ export function parseWorkspace(value: unknown): Workspace {
     !Array.isArray(value.templates) ||
     value.templates.length === 0 ||
     value.templates.length > 100 ||
+    (value.theme !== undefined && !['light', 'dark', 'system'].includes(String(value.theme))) ||
     !object(value.printer)
   )
     throw new Error('Invalid backup version or structure');
@@ -104,6 +116,7 @@ export function parseWorkspace(value: unknown): Workspace {
         element.type === 'date' &&
         (typeof element.prefix !== 'string' ||
           element.prefix.length > 100 ||
+          (element.source !== undefined && !['today', 'expiry'].includes(String(element.source))) ||
           !formats.includes(String(element.format)) ||
           !number(element.offsetDays, -3650, 3650) ||
           !number(element.offsetMonths, -120, 120) ||
@@ -131,6 +144,7 @@ export function parseWorkspace(value: unknown): Workspace {
   return {
     version: 1,
     language: value.language === 'en' ? 'en' : 'ru',
+    theme: value.theme === 'dark' || value.theme === 'system' ? value.theme : 'light',
     selectedTemplateId: templates.some((t) => t.id === selectedTemplateId)
       ? selectedTemplateId
       : (templates[0]?.id ?? ''),

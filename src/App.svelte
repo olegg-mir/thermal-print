@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import NavIcon from './NavIcon.svelte';
   import { strings } from './lib/i18n';
-  import { localDayKey } from './lib/calendar';
+  import { formatDate, localDayKey, shiftedLocalDate } from './lib/calendar';
+  import { withExpiry } from './lib/quick-label';
   import {
     DOTS_PER_MM,
     duplicateTemplate,
@@ -15,20 +17,42 @@
     type LabelElement,
     type LabelTemplate,
     type PrinterSettings,
+    type Theme,
     type Workspace,
   } from './lib/model';
   import { canvasToRows, elementBox, overflowIds, renderLabel } from './lib/render';
   import { exportWorkspace, loadWorkspace, parseWorkspace, saveWorkspace } from './lib/storage';
   import { BlePrinter, type PrinterStatus } from './lib/printer/ble';
 
-  type Tab = 'quick' | 'templates' | 'printer' | 'about' | 'editor';
+  type Tab = 'quick' | 'templates' | 'printer' | 'editor';
   const printer = new BlePrinter();
-  const frames: Frame[] = ['none', 'classic', 'jar', 'container', 'bag', 'leaves', 'dots'];
+  const frames: Frame[] = [
+    'none',
+    'classic',
+    'jar',
+    'container',
+    'bag',
+    'leaves',
+    'dots',
+    'bottle',
+    'freezer',
+    'ribbon',
+  ];
+  const fonts: FontFamily[] = [
+    'Noto Sans',
+    'Noto Serif',
+    'Roboto Condensed',
+    'Montserrat',
+    'Caveat',
+    'monospace',
+  ];
   let workspace: Workspace = initialWorkspace();
   let tab: Tab = 'quick';
   let editingTemplate: LabelTemplate | null = null;
   let selectedElementId = '';
   let productName = '';
+  let shelfLifeMonths = 0;
+  let shelfLifeDays = 0;
   let copies = 1;
   let now = new Date();
   let printerName = '';
@@ -49,17 +73,22 @@
 
   $: t = strings[workspace.language];
   $: if (typeof document !== 'undefined') document.documentElement.lang = workspace.language;
+  $: if (typeof document !== 'undefined') setDocumentTheme(workspace.theme);
   $: selectedTemplate =
     workspace.templates.find((item) => item.id === workspace.selectedTemplateId) ??
     workspace.templates[0];
-  $: activeTemplate = tab === 'editor' ? editingTemplate : selectedTemplate;
+  $: quickTemplate = selectedTemplate
+    ? withExpiry(selectedTemplate, shelfLifeMonths, shelfLifeDays, now, workspace.language)
+    : null;
+  $: activeTemplate = tab === 'editor' ? editingTemplate : quickTemplate;
+  $: previewProduct = tab === 'editor' ? '' : productName;
   $: selectedElement = editingTemplate?.elements.find((item) => item.id === selectedElementId);
   $: overflow = activeTemplate
-    ? overflowIds(activeTemplate, productName, now, workspace.language)
+    ? overflowIds(activeTemplate, previewProduct, now, workspace.language)
     : [];
   $: {
     activeTemplate;
-    productName;
+    previewProduct;
     now;
     workspace.language;
     selectedElementId;
@@ -72,7 +101,7 @@
     const signature = JSON.stringify({
       tab,
       template: activeTemplate,
-      productName,
+      previewProduct,
       day: localDayKey(now),
       language: workspace.language,
       selectedElementId,
@@ -93,6 +122,13 @@
     return `${element.style.bold ? 700 : 400} ${element.style.fontSize}px "${element.style.fontFamily}"`;
   }
 
+  function setDocumentTheme(theme: Theme): void {
+    const dark =
+      theme === 'dark' ||
+      (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  }
+
   async function ensureFonts(template: LabelTemplate): Promise<void> {
     const specs = [...new Set(template.elements.map(fontSpec))];
     await Promise.all(specs.map((spec) => document.fonts.load(spec, 'Продукт Product 0123456789')));
@@ -100,6 +136,9 @@
   }
 
   onMount(() => {
+    const themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+    const refreshTheme = () => setDocumentTheme(workspace.theme);
+    themeMedia.addEventListener('change', refreshTheme);
     loadWorkspace()
       .then((data) => {
         workspace = data;
@@ -123,19 +162,20 @@
       clearInterval(timer);
       clearTimeout(saveTimer);
       cancelAnimationFrame(previewRender.frame);
+      themeMedia.removeEventListener('change', refreshTheme);
       printer.disconnect();
     };
   });
 
   function drawPreview() {
     if (!previewCanvas || !activeTemplate) return;
-    const image = renderLabel(activeTemplate, productName, now, workspace.language);
+    const image = renderLabel(activeTemplate, previewProduct, now, workspace.language);
     previewCanvas.width = image.width;
     previewCanvas.height = image.height;
     previewCanvas.getContext('2d')!.drawImage(image, 0, 0);
     if (tab === 'editor' && selectedElement) {
       const ctx = previewCanvas.getContext('2d')!;
-      const box = elementBox(ctx, selectedElement, productName, now, workspace.language);
+      const box = elementBox(ctx, selectedElement, previewProduct, now, workspace.language);
       ctx.save();
       ctx.strokeStyle = '#6750a4';
       ctx.lineWidth = 2;
@@ -226,6 +266,7 @@
           : {
               ...base,
               type,
+              source: 'today',
               prefix: '',
               format: 'short',
               offsetDays: 0,
@@ -242,7 +283,7 @@
     const y = ((event.clientY - rect.top) * previewCanvas.height) / rect.height;
     const ctx = previewCanvas.getContext('2d')!;
     const found = [...editingTemplate.elements].reverse().find((item) => {
-      const box = elementBox(ctx, item, productName, now, workspace.language);
+      const box = elementBox(ctx, item, previewProduct, now, workspace.language);
       return (
         x >= box.x - 8 &&
         x <= box.x + box.width + 8 &&
@@ -288,7 +329,12 @@
       if ((e as Error).name !== 'NotFoundError') error = String(e);
     }
   }
-  async function sendPrint(template: LabelTemplate, product: string, count: number) {
+  async function sendPrint(
+    template: LabelTemplate,
+    product: string,
+    count: number,
+    includeExpiry = false,
+  ) {
     if (!printer.device) {
       error = t.errorPrinter;
       tab = 'printer';
@@ -300,7 +346,10 @@
     }
     const freshNow = new Date();
     now = freshNow;
-    if (overflowIds(template, product, freshNow, workspace.language).length) {
+    const printTemplate = includeExpiry
+      ? withExpiry(template, shelfLifeMonths, shelfLifeDays, freshNow, workspace.language)
+      : template;
+    if (overflowIds(printTemplate, product, freshNow, workspace.language).length) {
       error = t.overflow;
       return;
     }
@@ -308,8 +357,8 @@
     message = '';
     progress = 0;
     try {
-      await ensureFonts(template);
-      const rows = canvasToRows(renderLabel(template, product, freshNow, workspace.language));
+      await ensureFonts(printTemplate);
+      const rows = canvasToRows(renderLabel(printTemplate, product, freshNow, workspace.language));
       await printer.print(rows, workspace.printer, count);
       message = t.printDone;
     } catch (e) {
@@ -361,17 +410,15 @@
     <div class="rail-brand"><span class="brand-mark">▤</span><strong>Thermal Print</strong></div>
     <nav>
       <button class:active={tab === 'quick'} onclick={() => (tab = 'quick')}
-        >▣ <span>{t.quick}</span></button
+        ><NavIcon kind="print" /> <span>{t.quick}</span></button
       >
       <button
         class:active={tab === 'templates' || tab === 'editor'}
-        onclick={() => (tab = 'templates')}>▤ <span>{t.templates}</span></button
+        onclick={() => (tab = 'templates')}
+        ><NavIcon kind="templates" /> <span>{t.templates}</span></button
       >
       <button class:active={tab === 'printer'} onclick={() => (tab = 'printer')}
-        >▧ <span>{t.printer}</span></button
-      >
-      <button class:active={tab === 'about'} onclick={() => (tab = 'about')}
-        >ⓘ <span>{t.about}</span></button
+        ><NavIcon kind="settings" /> <span>{t.settingsNav}</span></button
       >
     </nav>
   </aside>
@@ -382,7 +429,7 @@
         <span class="brand-mark">▤</span><strong>Thermal Print</strong>
       </div>
       <div class="page-title">
-        <h1>{tab === 'editor' ? t.edit : t[tab]}</h1>
+        <h1>{tab === 'editor' ? t.edit : tab === 'printer' ? t.settingsNav : t[tab]}</h1>
         <p>{t.subtitle}</p>
       </div>
       <label class="language-switch"
@@ -434,6 +481,39 @@
                 bind:value={productName}
               /></label
             >
+            <div class="shelf-life">
+              <h3>{t.shelfLife}</h3>
+              <div class="two-fields">
+                <label
+                  >{t.shelfMonths}<input
+                    type="number"
+                    min="0"
+                    max="120"
+                    value={shelfLifeMonths}
+                    oninput={(e) => (shelfLifeMonths = num(e.currentTarget.value, 0, 0, 120))}
+                  /></label
+                >
+                <label
+                  >{t.shelfDays}<input
+                    type="number"
+                    min="0"
+                    max="3650"
+                    value={shelfLifeDays}
+                    oninput={(e) => (shelfLifeDays = num(e.currentTarget.value, 0, 0, 3650))}
+                  /></label
+                >
+              </div>
+              {#if shelfLifeMonths > 0 || shelfLifeDays > 0}
+                <p class="expiry-result">
+                  {t.expiryDate}: {formatDate(
+                    shiftedLocalDate(now, 0, shelfLifeMonths, shelfLifeDays),
+                    'short',
+                    workspace.language,
+                  )}
+                </p>
+                <p class="helper">{t.expiryHint}</p>
+              {/if}
+            </div>
             <label
               >{t.copies}<input
                 type="number"
@@ -458,7 +538,7 @@
               <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
               <md-filled-button
                 onclick={() =>
-                  selectedTemplate && void sendPrint(selectedTemplate, productName, copies)}
+                  selectedTemplate && void sendPrint(selectedTemplate, productName, copies, true)}
                 disabled={printerStatus === 'printing' || !selectedTemplate || overflow.length > 0}
                 >{t.print}</md-filled-button
               >
@@ -471,8 +551,8 @@
                 <span class="eyebrow">02 / {t.preview}</span>
                 <h2>{t.preview}</h2>
               </div>
-              {#if selectedTemplate}<span class="size-pill"
-                  >48 × {Math.round(selectedTemplate.height / DOTS_PER_MM)} mm</span
+              {#if quickTemplate}<span class="size-pill"
+                  >48 × {Math.round(quickTemplate.height / DOTS_PER_MM)} mm</span
                 >{/if}
             </div>
             <div class="preview-stage">
@@ -628,6 +708,19 @@
                   >{/if}
                 {#if selectedElement.type === 'date'}
                   <label
+                    >{t.dateSource}<select
+                      value={selectedElement.source ?? 'today'}
+                      onchange={(e) =>
+                        changeElement((item) => {
+                          if (item.type === 'date')
+                            item.source = e.currentTarget.value === 'expiry' ? 'expiry' : 'today';
+                        })}
+                    >
+                      <option value="today">{t.dateToday}</option>
+                      <option value="expiry">{t.dateExpiry}</option>
+                    </select></label
+                  >
+                  <label
                     >{t.prefix}<input
                       value={selectedElement.prefix}
                       maxlength="100"
@@ -703,9 +796,7 @@
                         changeElement(
                           (item) => (item.style.fontFamily = e.currentTarget.value as FontFamily),
                         )}
-                      ><option>Noto Sans</option><option>Noto Serif</option><option
-                        >monospace</option
-                      ></select
+                      >{#each fonts as font}<option value={font}>{font}</option>{/each}</select
                     ></label
                   >
                   <label
@@ -813,6 +904,7 @@
               ></canvas>
             </div>
             {#if overflow.length}<p class="helper warning">{t.overflow}</p>{/if}
+            <p class="helper">{t.editorSample}</p>
             <p class="helper">{t.dateInfo}</p>
           </section>
         </div>
@@ -860,6 +952,16 @@
                 onchange={(e) => setPrinterNumber('energy', e.currentTarget.value, 0, 65535)}
               /></label
             >
+            <input
+              class="setting-slider"
+              type="range"
+              min="0"
+              max="65535"
+              step="1"
+              value={workspace.printer.energy}
+              aria-label={t.energy}
+              oninput={(e) => setPrinterNumber('energy', e.currentTarget.value, 0, 65535)}
+            />
             <label
               >{t.speed}<input
                 type="number"
@@ -869,6 +971,16 @@
                 onchange={(e) => setPrinterNumber('speed', e.currentTarget.value, 1, 255)}
               /></label
             >
+            <input
+              class="setting-slider"
+              type="range"
+              min="1"
+              max="255"
+              step="1"
+              value={workspace.printer.speed}
+              aria-label={t.speed}
+              oninput={(e) => setPrinterNumber('speed', e.currentTarget.value, 1, 255)}
+            />
             <label
               >{t.preFeed}<input
                 type="number"
@@ -908,37 +1020,51 @@
               >
             </details>
           </section>
+          <section class="panel about-panel">
+            <span class="eyebrow">Thermal Print</span>
+            <h2>{t.appearance}</h2>
+            <label
+              >{t.theme}<select
+                value={workspace.theme}
+                onchange={(e) =>
+                  changeWorkspace((data) => (data.theme = e.currentTarget.value as Theme))}
+              >
+                <option value="light">{t.theme_light}</option>
+                <option value="dark">{t.theme_dark}</option>
+                <option value="system">{t.theme_system}</option>
+              </select></label
+            >
+            <div class="about-content">
+              <img src="./icon.svg" alt="Thermal Print" width="64" height="64" />
+              <div>
+                <h3>{t.about}</h3>
+                <p>{t.subtitle}. {t.localData}</p>
+                <p>{t.compatible}</p>
+                <p>{t.dateInfo}</p>
+                <a
+                  href="https://github.com/olegg-mir/thermal-print"
+                  target="_blank"
+                  rel="noopener noreferrer">{t.repo} ↗</a
+                >
+              </div>
+            </div>
+          </section>
         </div>
-      {:else if tab === 'about'}
-        <section class="panel about-panel">
-          <img src="./icon.svg" alt="Thermal Print" width="96" height="96" />
-          <h2>Thermal Print</h2>
-          <p>{t.subtitle}. {t.localData}</p>
-          <p>{t.compatible}</p>
-          <p>{t.dateInfo}</p>
-          <a
-            href="https://github.com/olegg-mir/thermal-print"
-            target="_blank"
-            rel="noopener noreferrer">{t.repo} ↗</a
-          >
-        </section>
       {/if}
     </main>
   </div>
 
   <nav class="bottom-nav" aria-label="Navigation">
     <button class:active={tab === 'quick'} onclick={() => (tab = 'quick')}
-      ><span>▣</span>{t.quick}</button
+      ><span><NavIcon kind="print" /></span>{t.quick}</button
     >
     <button
       class:active={tab === 'templates' || tab === 'editor'}
-      onclick={() => (tab = 'templates')}><span>▤</span>{t.templates}</button
+      onclick={() => (tab = 'templates')}
+      ><span><NavIcon kind="templates" /></span>{t.templates}</button
     >
     <button class:active={tab === 'printer'} onclick={() => (tab = 'printer')}
-      ><span>▧</span>{t.printer}</button
-    >
-    <button class:active={tab === 'about'} onclick={() => (tab = 'about')}
-      ><span>ⓘ</span>{t.about}</button
+      ><span><NavIcon kind="settings" /></span>{t.settingsNav}</button
     >
   </nav>
 </div>
