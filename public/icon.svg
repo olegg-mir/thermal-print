@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Thermal Print">
+  <rect width="512" height="512" rx="116" fill="#6750a4"/>
+  <rect x="100" y="174" width="312" height="184" rx="42" fill="#f7f2fa"/>
+  <rect x="140" y="105" width="232" height="97" rx="18" fill="#eaddff"/>
+  <path d="M140 192h232" stroke="#21005d" stroke-width="16"/>
+  <rect x="144" y="297" width="224" height="122" rx="13" fill="#fff" stroke="#21005d" stroke-width="14"/>
+  <path d="M172 341h168M172 370h113" stroke="#6750a4" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="360" cy="240" r="12" fill="#6750a4"/>
+</svg>

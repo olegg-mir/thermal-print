@@ -1,0 +1,73 @@
+# Thermal Print
+
+<p align="center"><img src="public/icon.svg" alt="Thermal Print icon" width="112"></p>
+
+**Thermal Print** — бесплатное устанавливаемое веб-приложение для создания и печати этикеток на Bluetooth-термопринтере MX10. Интерфейс рассчитан на телефон, но работает и на компьютере. Шаблон хранит оформление, а при печати достаточно ввести название продукта: поля даты обновятся автоматически.
+
+## Возможности
+
+- Визуальный редактор с перетаскиванием текста и точными координатами, шрифтами Noto Sans / Noto Serif, размером, жирностью и выравниванием.
+- Любое число текстовых полей и дат. Каждая дата имеет подпись, формат и смещение на дни, месяцы и годы.
+- Встроенные монохромные рамки: банка, контейнер, пакет, классическая, листья и точки.
+- Предпросмотр соответствует растровому заданию печати шириной **384 точки**. Длина этикетки на непрерывной ленте настраивается.
+- Профиль печати с плотностью, скоростью и пустыми строками до и после этикетки; пробная печать для калибровки.
+- Локальное хранение в IndexedDB, экспорт и импорт резервной копии JSON. Нет аккаунта, сервера и синхронизации.
+- Русский и английский интерфейс; работа редактора без сети после установки PWA.
+
+## О приложении
+
+Приложение печатает напрямую через Web Bluetooth. Основная проверяемая комбинация — **MX10 + Chrome на Android**. Chrome и Edge на поддерживаемых настольных системах также предоставляют Web Bluetooth. Safari на iPhone не предоставляет этот API: редактор и шаблоны откроются, но прямой печати из такой PWA не будет. Подключение требует HTTPS (либо `localhost`) и нажатия кнопки пользователем. Похожие модели семейства GB/GT/YT/MX могут работать по тому же профилю, но пока не проверены на оборудовании.
+
+Thermal Print хранит данные в конкретном браузере и профиле. Перед очисткой данных браузера или сменой телефона используйте **Шаблоны → Экспорт**. Импорт заменяет текущие шаблоны и настройки данными из файла.
+
+## Быстрый старт
+
+1. Откройте опубликованную PWA в Chrome на Android и установите её через меню браузера.
+2. Зарядите MX10, включите Bluetooth и нажмите **Подключить принтер**.
+3. Выберите шаблон, введите название продукта, проверьте предпросмотр и нажмите **Напечатать**.
+4. Для новой этикетки используйте **Шаблоны → Новый шаблон**. Коснитесь текста в предпросмотре, чтобы выбрать или перетащить его; точные параметры расположены слева/снизу.
+
+Пробная печать и подбор параметров описаны в [руководстве по калибровке](docs/calibration.md).
+
+## Разработка
+
+Нужны Node.js 20+ и npm.
+
+```sh
+npm ci
+npm run dev
+npm run check
+npm test
+npm run build
+```
+
+Локальный адрес Vite: `http://localhost:5173/thermal-print/`. Сборка находится в `dist/`. Переменная `base` и пути PWA уже рассчитаны на GitHub Pages по адресу `https://olegg-mir.github.io/thermal-print/`.
+
+## Архитектура
+
+- `src/lib/model.ts` — версия формата данных, шаблоны и параметры принтера.
+- `src/lib/calendar.ts` — локальные даты; сначала календарные годы и месяцы с ограничением до последнего дня месяца, затем дни.
+- `src/lib/render.ts` — один Canvas-рендер для предпросмотра и растровой печати.
+- `src/lib/printer/` — кодирование команд MX10 и Web Bluetooth-транспорт.
+- `src/lib/storage.ts` — IndexedDB и проверка резервных копий.
+- `src/App.svelte` — интерфейс Material Design 3 на телефоне и компьютере.
+
+Печать на настоящем MX10 ещё требует проверки пользователем. Автоматические тесты покрывают даты, формат команд и импорт; они не заменяют проверку отступов и плотности на бумаге.
+
+## Источники и лицензии
+
+Протокол MX10 описан в открытых проектах ниже. Реализация в этом репозитории написана для Thermal Print под MIT; исходный код AGPL-проектов не копировался.
+
+- [opuu/cat-printer](https://github.com/opuu/cat-printer) — браузерный SDK, список совместимых моделей; AGPL-3.0, справочный источник.
+- [elyez-dev/MeowPrinter](https://github.com/elyez-dev/MeowPrinter) — совместимые модели и печать растровых этикеток; справочный источник.
+- [ouor/my-bt-printers](https://github.com/ouor/my-bt-printers) — документированная калибровка MX10 и BLE-профиль; справочный источник.
+- [s8n/cataclysm](https://github.com/s8n/cataclysm) — исследование MX10 и его особенностей Web Bluetooth; MIT.
+- [NaitLee/kitty-printer](https://github.com/NaitLee/kitty-printer) — описание формата команд; протокольный файл опубликован под CC0-1.0.
+- [Material Web](https://github.com/material-components/material-web) — компоненты Material Design 3, Apache-2.0.
+- [Noto Sans](https://github.com/notofonts/latin-greek-cyrillic) и [Noto Serif](https://github.com/notofonts/latin-greek-cyrillic) — шрифты под SIL Open Font License.
+
+Лицензия Thermal Print: [MIT](LICENSE).
+
+## English
+
+Thermal Print is a mobile-first, installable PWA for MX10 Bluetooth thermal printers. Build reusable product-label templates with text, dynamic dates, and monochrome frames; then enter a product name and print. Templates and printer settings are stored locally with JSON backup export/import. Printing requires Web Bluetooth in a secure context; Android Chrome is the primary target. The UI is available in Russian and English. See the sections above for development commands, architecture, hardware limitations, and source acknowledgements.
