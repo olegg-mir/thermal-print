@@ -16,6 +16,7 @@ export class BlePrinter {
   onProgress?: (progress: number) => void;
   onError?: (message: string) => void;
   private paused = false;
+  private fault = 0;
 
   static supported(): boolean {
     return typeof navigator !== 'undefined' && 'bluetooth' in navigator && window.isSecureContext;
@@ -51,6 +52,7 @@ export class BlePrinter {
     if (!this.device?.gatt) throw new Error('Choose a printer first');
     if (this.device.gatt.connected && this.characteristic) return;
     this.update('connecting');
+    this.paused = false;
     try {
       const server = await this.device.gatt.connect();
       let service: BluetoothRemoteGATTService;
@@ -69,7 +71,8 @@ export class BlePrinter {
           const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
           const flags = value && value.byteLength > 6 ? value.getUint8(6) : 0;
           this.paused = (flags & 0x10) !== 0;
-          if (flags & 0x0f) this.onError?.(`Printer status: 0x${flags.toString(16)}`);
+          this.fault = flags & 0x0f;
+          if (this.fault) this.onError?.(`Printer status: 0x${flags.toString(16)}`);
         });
       } catch {
         /* Some compatible models do not expose notifications. */
@@ -83,6 +86,7 @@ export class BlePrinter {
 
   async print(rows: Uint8Array[], settings: PrinterSettings, copies: number): Promise<void> {
     if (!this.device) throw new Error('Choose a printer first');
+    this.fault = 0;
     const job = buildJob(rows, settings);
     for (let copy = 0; copy < copies; copy++) {
       await this.connect();
@@ -90,6 +94,7 @@ export class BlePrinter {
       this.update('printing');
       try {
         for (let offset = 0; offset < job.length; offset += settings.packetSize) {
+          if (this.fault) throw new Error(`Printer stopped: 0x${this.fault.toString(16)}`);
           let wait = 0;
           while (this.paused && wait++ < 100) await delay(100);
           if (this.paused) throw new Error('Printer did not resume');
