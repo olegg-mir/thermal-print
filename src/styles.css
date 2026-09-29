@@ -1,5 +1,7 @@
 :root {
   font-family: 'Noto Sans', sans-serif;
+  --md-ref-typeface-plain: 'Noto Sans';
+  --md-ref-typeface-brand: 'Noto Sans';
   color: #1d1b20;
   background: #f5f3f7;
   font-synthesis: none;

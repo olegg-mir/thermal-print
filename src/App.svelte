@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount } from 'svelte';
   import { strings } from './lib/i18n';
   import { localDayKey } from './lib/calendar';
   import {
@@ -40,6 +40,10 @@
   let importInput: HTMLInputElement;
   let saveTimer: ReturnType<typeof setTimeout>;
   const readyFonts = new Set<string>();
+  const previewRender: { canvas?: HTMLCanvasElement; signature: string; frame: number } = {
+    signature: '',
+    frame: 0,
+  };
   let dragging: { pointerId: number; startX: number; startY: number; x: number; y: number } | null =
     null;
 
@@ -60,12 +64,26 @@
     workspace.language;
     selectedElementId;
     previewCanvas;
-    void tick().then(() => {
+    schedulePreview();
+  }
+
+  function schedulePreview() {
+    if (!previewCanvas || !activeTemplate) return;
+    const signature = JSON.stringify({
+      tab,
+      template: activeTemplate,
+      productName,
+      day: localDayKey(now),
+      language: workspace.language,
+      selectedElementId,
+    });
+    if (previewRender.canvas === previewCanvas && previewRender.signature === signature) return;
+    previewRender.canvas = previewCanvas;
+    previewRender.signature = signature;
+    cancelAnimationFrame(previewRender.frame);
+    previewRender.frame = requestAnimationFrame(() => {
       drawPreview();
-      if (
-        activeTemplate &&
-        activeTemplate.elements.some((element) => !readyFonts.has(fontSpec(element)))
-      ) {
+      if (activeTemplate?.elements.some((element) => !readyFonts.has(fontSpec(element)))) {
         void ensureFonts(activeTemplate).then(drawPreview);
       }
     });
@@ -104,6 +122,7 @@
     return () => {
       clearInterval(timer);
       clearTimeout(saveTimer);
+      cancelAnimationFrame(previewRender.frame);
       printer.disconnect();
     };
   });
