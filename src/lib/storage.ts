@@ -1,9 +1,11 @@
 import { parseLocalDateInput } from './calendar';
 import {
   ADAPTIVE_TEMPLATE_ID,
+  defaultAdaptiveSettings,
   defaultPrinterSettings,
   initialWorkspace,
   type Workspace,
+  type AdaptiveSettings,
 } from './model';
 
 const DB_NAME = 'thermal-print';
@@ -75,10 +77,24 @@ const fonts = ['Noto Sans', 'Noto Serif', 'Roboto Condensed', 'Montserrat', 'Cav
 const aligns = ['left', 'center', 'right'];
 const formats = ['short', 'shortYear', 'iso', 'long'];
 
+function parseAdaptive(value: unknown): AdaptiveSettings {
+  if (
+    !object(value) ||
+    !fonts.includes(String(value.fontFamily)) ||
+    !number(value.fontSize, 16, 96) ||
+    typeof value.bold !== 'boolean' ||
+    typeof value.frameEnabled !== 'boolean' ||
+    value.frame === 'none' ||
+    !frames.includes(String(value.frame))
+  )
+    throw new Error('Invalid adaptive settings');
+  return value as unknown as AdaptiveSettings;
+}
+
 export function parseWorkspace(value: unknown): Workspace {
   if (
     !object(value) ||
-    (value.version !== 1 && value.version !== 2) ||
+    (value.version !== 1 && value.version !== 2 && value.version !== 3) ||
     !Array.isArray(value.templates) ||
     value.templates.length === 0 ||
     value.templates.length > 100 ||
@@ -167,10 +183,11 @@ export function parseWorkspace(value: unknown): Workspace {
       typeof raw.showProductionDate !== 'boolean'
     )
       throw new Error('Invalid print history entry');
+    if (raw.adaptive !== undefined) parseAdaptive(raw.adaptive);
     return raw;
   }) as unknown as Workspace['history'];
   return {
-    version: 2,
+    version: 3,
     language: value.language === 'en' ? 'en' : 'ru',
     theme: value.theme === 'dark' || value.theme === 'system' ? value.theme : 'light',
     selectedTemplateId:
@@ -180,6 +197,7 @@ export function parseWorkspace(value: unknown): Workspace {
         : (templates[0]?.id ?? ''),
     templates,
     printer: { ...defaultPrinterSettings, ...printer } as Workspace['printer'],
+    adaptive: value.version === 3 ? parseAdaptive(value.adaptive) : { ...defaultAdaptiveSettings },
     history,
   };
 }

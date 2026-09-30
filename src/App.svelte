@@ -19,6 +19,7 @@
     duplicateTemplate,
     initialWorkspace,
     newTemplate,
+    type AdaptiveSettings,
     type Align,
     type DateElement,
     type DateFormat,
@@ -78,6 +79,7 @@
   let showProductionDate = true;
   let quickOptionsOpen = false;
   let copies = 1;
+  let fontRevision = 0;
   let now = new Date();
   let printerName = '';
   let printerStatus: PrinterStatus = 'idle';
@@ -111,6 +113,8 @@
           useShelfLife ? shelfLifeMonths : 0,
           useShelfLife ? shelfLifeDays : 0,
           workspace.language,
+          workspace.adaptive,
+          fontRevision,
         )
       : (workspace.templates.find((item) => item.id === workspace.selectedTemplateId) ??
         workspace.templates[0]);
@@ -176,6 +180,8 @@
     months: number,
     days: number,
     language: Workspace['language'],
+    settings: AdaptiveSettings,
+    _fontRevision = 0,
   ): LabelTemplate {
     const ctx = document.createElement('canvas').getContext('2d')!;
     return adaptiveTemplate(
@@ -186,6 +192,7 @@
         shelfLifeMonths: months,
         shelfLifeDays: days,
         language,
+        settings,
       },
       ctx,
     );
@@ -200,8 +207,13 @@
 
   async function ensureFonts(template: LabelTemplate): Promise<void> {
     const specs = [...new Set(template.elements.map(fontSpec))];
-    await Promise.all(specs.map((spec) => document.fonts.load(spec, 'Продукт Product 0123456789')));
-    specs.forEach((spec) => readyFonts.add(spec));
+    const missing = specs.filter((spec) => !readyFonts.has(spec));
+    if (!missing.length) return;
+    await Promise.all(
+      missing.map((spec) => document.fonts.load(spec, 'Продукт Product 0123456789')),
+    );
+    missing.forEach((spec) => readyFonts.add(spec));
+    fontRevision += 1;
   }
 
   onMount(() => {
@@ -475,7 +487,6 @@
   ) {
     if (!printer.device) {
       error = t.errorPrinter;
-      tab = 'printer';
       return;
     }
     if (template.elements.some((element) => element.type === 'product') && !product.trim()) {
@@ -494,7 +505,10 @@
     progress = 0;
     try {
       if (template.id === ADAPTIVE_TEMPLATE_ID) {
-        await document.fonts.load('700 50px "Noto Sans"', product);
+        await document.fonts.load(
+          `${workspace.adaptive.bold ? 700 : 400} ${workspace.adaptive.fontSize}px "${workspace.adaptive.fontFamily}"`,
+          product,
+        );
       }
       const printTemplate =
         template.id === ADAPTIVE_TEMPLATE_ID
@@ -505,6 +519,7 @@
               useShelfLife ? shelfLifeMonths : 0,
               useShelfLife ? shelfLifeDays : 0,
               workspace.language,
+              workspace.adaptive,
             )
           : includeExpiry
             ? withExpiry(
@@ -529,6 +544,7 @@
           shelfLifeDays: useShelfLife ? shelfLifeDays : 0,
           copies: count,
           showProductionDate,
+          ...(template.id === ADAPTIVE_TEMPLATE_ID ? { adaptive: { ...workspace.adaptive } } : {}),
         };
         changeWorkspace((data) => {
           data.history = [entry, ...data.history].slice(0, 10);
@@ -562,6 +578,8 @@
     ) {
       changeWorkspace((data) => {
         data.selectedTemplateId = entry.templateId;
+        if (entry.templateId === ADAPTIVE_TEMPLATE_ID && entry.adaptive)
+          data.adaptive = { ...entry.adaptive };
       });
     }
     tab = 'quick';
@@ -688,12 +706,80 @@
             >
             <details class="quick-options" bind:open={quickOptionsOpen}>
               <summary>{t.quickOptions}</summary>
-              {#if isAdaptive}<label class="checkbox-label"
+              {#if isAdaptive}
+                <div class="adaptive-settings">
+                  <p class="adaptive-settings-title">{t.adaptiveStyle}</p>
+                  <div class="two-fields">
+                    <label
+                      >{t.font}<select
+                        value={workspace.adaptive.fontFamily}
+                        onchange={(e) =>
+                          changeWorkspace(
+                            (data) =>
+                              (data.adaptive.fontFamily = e.currentTarget.value as FontFamily),
+                          )}
+                        >{#each fonts as font}<option value={font}>{font}</option>{/each}</select
+                      ></label
+                    >
+                    <label
+                      >{t.adaptiveFontSize}<input
+                        type="number"
+                        min="16"
+                        max="96"
+                        step="1"
+                        value={workspace.adaptive.fontSize}
+                        oninput={(e) =>
+                          changeWorkspace(
+                            (data) =>
+                              (data.adaptive.fontSize = num(e.currentTarget.value, 50, 16, 96)),
+                          )}
+                      /></label
+                    >
+                  </div>
+                  <label class="checkbox-label"
+                    ><input
+                      type="checkbox"
+                      checked={workspace.adaptive.bold}
+                      onchange={(e) =>
+                        changeWorkspace((data) => (data.adaptive.bold = e.currentTarget.checked))}
+                    />{t.adaptiveBold}</label
+                  >
+                  <label class="checkbox-label"
+                    ><input
+                      type="checkbox"
+                      checked={workspace.adaptive.frameEnabled}
+                      onchange={(e) =>
+                        changeWorkspace(
+                          (data) => (data.adaptive.frameEnabled = e.currentTarget.checked),
+                        )}
+                    />{t.adaptiveFrame}</label
+                  >
+                  {#if workspace.adaptive.frameEnabled}
+                    <label
+                      >{t.frame}<select
+                        value={workspace.adaptive.frame}
+                        onchange={(e) =>
+                          changeWorkspace(
+                            (data) =>
+                              (data.adaptive.frame = e.currentTarget.value as Exclude<
+                                Frame,
+                                'none'
+                              >),
+                          )}
+                        >{#each frames.filter((frame) => frame !== 'none') as frame}<option
+                            value={frame}>{t[`frame_${frame}`]}</option
+                          >{/each}</select
+                      ></label
+                    >
+                  {/if}
+                </div>
+                <label class="checkbox-label"
                   ><input
                     type="checkbox"
                     bind:checked={showProductionDate}
                   />{t.showProductionDate}</label
-                >{/if}
+                >
+              {/if}
               <label class="checkbox-label"
                 ><input
                   type="checkbox"

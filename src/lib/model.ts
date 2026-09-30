@@ -67,6 +67,14 @@ export interface PrinterSettings {
   packetDelay: number;
 }
 
+export interface AdaptiveSettings {
+  fontFamily: FontFamily;
+  fontSize: number;
+  bold: boolean;
+  frameEnabled: boolean;
+  frame: Exclude<Frame, 'none'>;
+}
+
 export interface PrintHistoryEntry {
   id: string;
   printedAt: string;
@@ -77,15 +85,17 @@ export interface PrintHistoryEntry {
   shelfLifeDays: number;
   copies: number;
   showProductionDate: boolean;
+  adaptive?: AdaptiveSettings;
 }
 
 export interface Workspace {
-  version: 2;
+  version: 3;
   language: Language;
   theme: Theme;
   selectedTemplateId: string;
   templates: LabelTemplate[];
   printer: PrinterSettings;
+  adaptive: AdaptiveSettings;
   history: PrintHistoryEntry[];
 }
 
@@ -100,6 +110,14 @@ export const defaultPrinterSettings: PrinterSettings = {
   postFeed: 100,
   packetSize: 160,
   packetDelay: 20,
+};
+
+export const defaultAdaptiveSettings: AdaptiveSettings = {
+  fontFamily: 'Noto Sans',
+  fontSize: 50,
+  bold: true,
+  frameEnabled: false,
+  frame: 'classic',
 };
 
 export function newTemplate(name = 'Продукт', language: Language = 'ru'): LabelTemplate {
@@ -139,12 +157,13 @@ export function newTemplate(name = 'Продукт', language: Language = 'ru'):
 export function initialWorkspace(): Workspace {
   const template = newTemplate();
   return {
-    version: 2,
+    version: 3,
     language: 'ru',
     theme: 'light',
     selectedTemplateId: template.id,
     templates: [template],
     printer: { ...defaultPrinterSettings },
+    adaptive: { ...defaultAdaptiveSettings },
     history: [],
   };
 }

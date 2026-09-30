@@ -9,7 +9,7 @@ describe('backup validation', () => {
   });
   it('rejects unknown versions and invalid printer settings', () => {
     const source = initialWorkspace();
-    expect(() => parseWorkspace({ ...source, version: 3 })).toThrow();
+    expect(() => parseWorkspace({ ...source, version: 4 })).toThrow();
     expect(() =>
       parseWorkspace({ ...source, printer: { ...source.printer, packetSize: 1000 } }),
     ).toThrow();
@@ -19,9 +19,10 @@ describe('backup validation', () => {
     const old = { ...source, version: 1 } as Record<string, unknown>;
     delete old.history;
     expect(parseWorkspace(old)).toMatchObject({
-      version: 2,
+      version: 3,
       history: [],
       templates: source.templates,
+      adaptive: source.adaptive,
     });
     source.history = [
       {
@@ -37,6 +38,14 @@ describe('backup validation', () => {
       },
     ];
     expect(parseWorkspace(source).history).toEqual(source.history);
+    const oldV2 = { ...source, version: 2 } as Record<string, unknown>;
+    delete oldV2.adaptive;
+    expect(parseWorkspace(oldV2).adaptive).toEqual(source.adaptive);
+    source.history[0].adaptive = { ...source.adaptive, fontSize: 36 };
+    expect(parseWorkspace(source).history[0].adaptive?.fontSize).toBe(36);
+    expect(() =>
+      parseWorkspace({ ...source, adaptive: { ...source.adaptive, fontSize: 500 } }),
+    ).toThrow();
     expect(() =>
       parseWorkspace({ ...source, history: [{ ...source.history[0], baseDate: '2026-02-30' }] }),
     ).toThrow();

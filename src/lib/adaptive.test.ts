@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { adaptiveTemplate } from './adaptive';
+import { defaultAdaptiveSettings } from './model';
 
 const context = {
   font: '',
@@ -11,6 +12,7 @@ const base = {
   shelfLifeMonths: 0,
   shelfLifeDays: 0,
   language: 'ru' as const,
+  settings: defaultAdaptiveSettings,
 };
 
 describe('adaptive system template', () => {
@@ -36,5 +38,33 @@ describe('adaptive system template', () => {
     expect(bothDates.elements.at(-1)).toMatchObject({ text: 'Годен до: 28.02.2025' });
     for (const template of [oneLine, twoLines, dated, bothDates])
       expect(template.height % 8).toBe(0);
+  });
+  it('uses saved font and frame settings in the same dynamic layout', () => {
+    const plain = adaptiveTemplate(
+      { ...base, product: 'Очень длинное название продукта' },
+      context,
+    );
+    const styled = adaptiveTemplate(
+      {
+        ...base,
+        product: 'Очень длинное название продукта',
+        settings: {
+          fontFamily: 'Noto Serif',
+          fontSize: 64,
+          bold: false,
+          frameEnabled: true,
+          frame: 'classic',
+        },
+      },
+      context,
+    );
+    expect(styled.frame).toBe('classic');
+    expect(styled.elements[0]).toMatchObject({
+      x: 24,
+      width: 336,
+      style: { fontFamily: 'Noto Serif', fontSize: 64, bold: false },
+    });
+    expect(styled.height).toBeGreaterThan(plain.height);
+    expect(styled.height % 8).toBe(0);
   });
 });

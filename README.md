@@ -29,7 +29,7 @@ Thermal Print хранит данные в конкретном браузере
 
 1. Откройте опубликованную PWA в Chrome на Android и установите её через меню браузера.
 2. Зарядите MX10, включите Bluetooth и нажмите **Подключить принтер**.
-3. Выберите обычный или встроенный **Адаптивный** шаблон и введите название продукта. В блоке **Дата, срок годности и копии** при необходимости выберите другую дату, задайте срок в месяцах и днях либо число копий. Для адаптивного шаблона можно отключить печать текущей даты. Проверьте предпросмотр и нажмите **Напечатать**. Текущая дата пересчитывается непосредственно перед отправкой задания, если другая дата не выбрана вручную.
+3. Выберите обычный или встроенный **Адаптивный** шаблон и введите название продукта. В блоке **Оформление, дата и копии** можно выбрать шрифт и размер названия, жирность, включить рамку (по умолчанию выбрана классическая), отключить печать даты, выбрать другую дату, задать срок годности или число копий. Настройки адаптивной этикетки сохраняются; запись в истории печати восстанавливает их вместе с данными продукта. Проверьте предпросмотр и нажмите **Напечатать**. Текущая дата пересчитывается непосредственно перед отправкой задания, если другая дата не выбрана вручную.
 4. Для новой этикетки используйте **Шаблоны → Новый шаблон**. Коснитесь текста в предпросмотре, чтобы выбрать или перетащить его; точные параметры расположены слева/снизу. Кнопки положения выравнивают блок по центру или краям холста; при перетаскивании рядом с ними блок притягивается. При сокращении длины элементы за холстом остаются видны в редакторе. Предупреждение о них не блокирует печать: за пределами этикетки эти части не отпечатаются. Для точного размещения срока годности добавьте **+ Годен до**. Если такого поля нет, приложение добавит строку внизу и удлинит этикетку на 7 мм. Если срок не задан, поле даты окончания не печатается.
 5. Недавние успешно отправленные этикетки находятся под предпросмотром. Нажмите на запись, чтобы восстановить её значения. История хранится локально и входит в резервную копию.
 6. Тема и параметры принтера находятся в разделе **Настройки**. Там же расположен раздел о приложении.
@@ -58,7 +58,7 @@ npm run build
 - `src/lib/adaptive.ts` — встроенный шаблон с длиной по переносу текста и включённым датам.
 - `src/lib/render.ts` — один Canvas-рендер для предпросмотра и растровой печати.
 - `src/lib/printer/` — кодирование команд MX10 и Web Bluetooth-транспорт.
-- `src/lib/storage.ts` — IndexedDB, история печати, проверка резервных копий и миграция формата 1 → 2.
+- `src/lib/storage.ts` — IndexedDB, история печати, проверка резервных копий и миграция форматов 1/2 → 3.
 - `src/App.svelte` — интерфейс Material Design 3 на телефоне и компьютере.
 
 Печать на настоящем MX10 подтверждена пользователем. Восстановление BLE после сворачивания приложения и обработка редкого статуса `0xe` требуют повторной проверки на устройстве после обновления. Автоматические тесты покрывают даты, формат команд, импорт и сброс BLE-сессии; они не заменяют проверку на бумаге.
@@ -83,4 +83,4 @@ npm run build
 
 Thermal Print is a mobile-first, installable PWA for MX10 Bluetooth thermal printers. Build reusable product-label templates with text, dynamic dates, and monochrome frames; then enter a product name and print. Templates and printer settings are stored locally with JSON backup export/import. Printing requires Web Bluetooth in a secure context; Android Chrome is the primary target. The UI is available in Russian and English. See the sections above for development commands, architecture, hardware limitations, and source acknowledgements.
 
-The built-in Adaptive template uses a bold 50-dot product name and shortens or lengthens the label according to wrapping and enabled dates. The last 10 sent labels can restore their print values. In the editor, off-label elements stay visible and can be moved back; they do not block printing.
+The built-in Adaptive template starts with a bold 50-dot product name and shortens or lengthens the label according to wrapping and enabled dates. Its font, size, weight and optional frame are saved locally. The last 10 sent labels restore their print values and adaptive style. In the editor, off-label elements stay visible and can be moved back; they do not block printing.

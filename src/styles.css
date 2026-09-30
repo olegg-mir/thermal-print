@@ -281,6 +281,16 @@ md-filled-tonal-button {
 .quick-options .two-fields label {
   margin-bottom: 8px;
 }
+.adaptive-settings {
+  border-bottom: 1px solid #e8e4eb;
+  margin-bottom: 14px;
+  padding-bottom: 3px;
+}
+.adaptive-settings-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin: 8px 0 12px;
+}
 .quick-options .expiry-result {
   margin: 2px 0 14px;
   font-size: 0.84rem;
