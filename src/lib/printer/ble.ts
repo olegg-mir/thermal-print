@@ -6,6 +6,20 @@ const AF30 = '0000af30-0000-1000-8000-00805f9b34fb';
 const uuid = (code: string) => `0000${code}-0000-1000-8000-00805f9b34fb`;
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+async function timed<T>(operation: Promise<T>, label: string, ms = 12000): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export type PrinterStatus = 'idle' | 'connecting' | 'connected' | 'printing' | 'disconnected';
 
 export class BlePrinter {
@@ -15,8 +29,11 @@ export class BlePrinter {
   onStatus?: (status: PrinterStatus) => void;
   onProgress?: (progress: number) => void;
   onError?: (message: string) => void;
+  private notifications?: BluetoothRemoteGATTCharacteristic;
+  private notificationHandler?: EventListener;
   private paused = false;
   private fault = 0;
+  private session = 0;
 
   static supported(): boolean {
     return typeof navigator !== 'undefined' && 'bluetooth' in navigator && window.isSecureContext;
@@ -27,9 +44,30 @@ export class BlePrinter {
     this.onStatus?.(status);
   }
 
+  private readonly onDisconnected = () => {
+    if (this.device?.gatt?.connected) return;
+    this.clearSession();
+    this.update('disconnected');
+  };
+
+  private clearSession(): void {
+    this.session++;
+    if (this.notifications && this.notificationHandler) {
+      this.notifications.removeEventListener(
+        'characteristicvaluechanged',
+        this.notificationHandler,
+      );
+    }
+    this.notifications = undefined;
+    this.notificationHandler = undefined;
+    this.characteristic = undefined;
+    this.paused = false;
+    this.fault = 0;
+  }
+
   async choose(): Promise<string> {
     if (!BlePrinter.supported()) throw new Error('Web Bluetooth unavailable');
-    this.device = await navigator.bluetooth.requestDevice({
+    const device = await navigator.bluetooth.requestDevice({
       filters: [
         { services: [AE30] },
         { services: [AF30] },
@@ -40,86 +78,126 @@ export class BlePrinter {
       ],
       optionalServices: [AE30, AF30],
     });
-    this.device.addEventListener('gattserverdisconnected', () => {
-      this.characteristic = undefined;
-      this.update('disconnected');
-    });
+    this.disconnect();
+    this.device?.removeEventListener('gattserverdisconnected', this.onDisconnected);
+    this.device = device;
+    device.addEventListener('gattserverdisconnected', this.onDisconnected);
+    await this.connect();
+    return device.name || 'BLE printer';
+  }
+
+  async reconnect(): Promise<string> {
+    if (!this.device) return this.choose();
+    this.disconnect();
     await this.connect();
     return this.device.name || 'BLE printer';
+  }
+
+  /** A backgrounded browser can retain a GATT object whose radio link has gone stale. */
+  onPageHidden(): void {
+    if (this.status === 'connected' || this.status === 'connecting') this.disconnect();
   }
 
   async connect(): Promise<void> {
     if (!this.device?.gatt) throw new Error('Choose a printer first');
     if (this.device.gatt.connected && this.characteristic) return;
+    this.clearSession();
+    const currentSession = this.session;
     this.update('connecting');
-    this.paused = false;
     try {
-      const server = await this.device.gatt.connect();
+      const server = await timed(this.device.gatt.connect(), 'Bluetooth connection');
       let service: BluetoothRemoteGATTService;
       let family = 'ae';
       try {
-        service = await server.getPrimaryService(AE30);
+        service = await timed(server.getPrimaryService(AE30), 'Bluetooth service');
       } catch {
-        service = await server.getPrimaryService(AF30);
+        service = await timed(server.getPrimaryService(AF30), 'Bluetooth service');
         family = 'af';
       }
-      this.characteristic = await service.getCharacteristic(uuid(`${family}01`));
+      const characteristic = await timed(
+        service.getCharacteristic(uuid(`${family}01`)),
+        'Bluetooth write channel',
+      );
       try {
-        const notifications = await service.getCharacteristic(uuid(`${family}02`));
-        await notifications.startNotifications();
-        notifications.addEventListener('characteristicvaluechanged', (event) => {
+        const notifications = await timed(
+          service.getCharacteristic(uuid(`${family}02`)),
+          'Bluetooth notifications',
+        );
+        await timed(notifications.startNotifications(), 'Bluetooth notifications');
+        const handler: EventListener = (event) => {
+          if (this.session !== currentSession) return;
           const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
-          const flags = value && value.byteLength > 6 ? value.getUint8(6) : 0;
+          // AE is the flow-control frame. Other replies can carry unrelated payloads.
+          if (
+            !value ||
+            value.byteLength < 9 ||
+            value.getUint8(0) !== 0x51 ||
+            value.getUint8(1) !== 0x78 ||
+            value.getUint8(2) !== 0xae
+          )
+            return;
+          const flags = value.getUint8(6);
           this.paused = (flags & 0x10) !== 0;
           this.fault = flags & 0x0f;
           if (this.fault) this.onError?.(`Printer status: 0x${flags.toString(16)}`);
-        });
+        };
+        notifications.addEventListener('characteristicvaluechanged', handler);
+        this.notifications = notifications;
+        this.notificationHandler = handler;
       } catch {
-        /* Some compatible models do not expose notifications. */
+        // Some compatible models do not expose notifications.
       }
+      if (this.session !== currentSession) throw new Error('Bluetooth connection was interrupted');
+      this.characteristic = characteristic;
       this.update('connected');
     } catch (error) {
-      this.update('disconnected');
+      this.disconnect();
       throw error;
     }
   }
 
   async print(rows: Uint8Array[], settings: PrinterSettings, copies: number): Promise<void> {
     if (!this.device) throw new Error('Choose a printer first');
-    this.fault = 0;
     const job = buildJob(rows, settings);
-    for (let copy = 0; copy < copies; copy++) {
-      await this.connect();
-      const characteristic = this.characteristic!;
-      this.update('printing');
-      try {
-        for (let offset = 0; offset < job.length; offset += settings.packetSize) {
+    try {
+      for (let copy = 0; copy < copies; copy++) {
+        await this.connect();
+        const characteristic = this.characteristic!;
+        this.update('printing');
+        try {
+          for (let offset = 0; offset < job.length; offset += settings.packetSize) {
+            if (this.characteristic !== characteristic) throw new Error('Bluetooth disconnected');
+            if (this.fault) throw new Error(`Printer stopped: 0x${this.fault.toString(16)}`);
+            let wait = 0;
+            while (this.paused && wait++ < 100) await delay(100);
+            if (this.paused) throw new Error('Printer did not resume');
+            await timed(
+              characteristic.writeValueWithoutResponse(
+                job.slice(offset, offset + settings.packetSize),
+              ),
+              'Bluetooth write',
+            );
+            this.onProgress?.(
+              (copy + Math.min(1, (offset + settings.packetSize) / job.length)) / copies,
+            );
+            if (settings.packetDelay) await delay(settings.packetDelay);
+          }
+          // Let the MX10 buffer drain; each copy then gets a fresh GATT session.
+          await delay(3000);
           if (this.fault) throw new Error(`Printer stopped: 0x${this.fault.toString(16)}`);
-          let wait = 0;
-          while (this.paused && wait++ < 100) await delay(100);
-          if (this.paused) throw new Error('Printer did not resume');
-          await characteristic.writeValueWithoutResponse(
-            job.slice(offset, offset + settings.packetSize),
-          );
-          this.onProgress?.(
-            (copy + Math.min(1, (offset + settings.packetSize) / job.length)) / copies,
-          );
-          if (settings.packetDelay) await delay(settings.packetDelay);
+        } finally {
+          this.disconnect();
         }
-        // Allow the MX10 buffer to drain before closing GATT; the next copy reconnects.
-        await delay(3000);
-      } finally {
-        this.device.gatt?.disconnect();
-        this.characteristic = undefined;
       }
+      this.onProgress?.(1);
+    } finally {
+      this.disconnect();
     }
-    this.onProgress?.(1);
-    this.update('disconnected');
   }
 
   disconnect(): void {
+    this.clearSession();
     this.device?.gatt?.disconnect();
-    this.characteristic = undefined;
     this.update('disconnected');
   }
 }

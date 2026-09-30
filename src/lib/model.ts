@@ -80,10 +80,10 @@ export const PRINT_WIDTH = 384;
 export const DOTS_PER_MM = 8;
 
 export const defaultPrinterSettings: PrinterSettings = {
-  energy: 0x6000,
+  energy: 65535,
   speed: 32,
-  preFeed: 40,
-  postFeed: 64,
+  preFeed: 5,
+  postFeed: 100,
   packetSize: 160,
   packetDelay: 20,
 };

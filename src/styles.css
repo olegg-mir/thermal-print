@@ -96,6 +96,10 @@ md-filled-tonal-button {
   font-size: 1.35rem;
   line-height: 1;
 }
+.brand-mark .nav-icon {
+  width: 21px;
+  height: 21px;
+}
 .rail nav {
   display: grid;
   gap: 6px;
@@ -253,6 +257,33 @@ md-filled-tonal-button {
 }
 .shelf-life .helper {
   margin-top: 4px;
+}
+.quick-options {
+  border: 1px solid #e8e4eb;
+  border-radius: 14px;
+  margin: 0 0 14px;
+  padding: 0 14px;
+}
+.quick-options summary {
+  color: #6750a4;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 12px 0;
+}
+.quick-options[open] {
+  padding-bottom: 8px;
+}
+.panel .quick-options .checkbox-label {
+  padding-top: 0;
+  margin-bottom: 12px;
+}
+.quick-options .two-fields label {
+  margin-bottom: 8px;
+}
+.quick-options .expiry-result {
+  margin: 2px 0 14px;
+  font-size: 0.84rem;
 }
 .action-stack {
   display: grid;
@@ -414,6 +445,36 @@ md-filled-tonal-button {
   accent-color: #6750a4;
   width: 18px;
   height: 18px;
+}
+.position-controls {
+  margin: 4px 0 16px;
+}
+.position-controls h4 {
+  margin: 0 0 9px;
+}
+.position-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+.position-row span {
+  flex: 0 0 110px;
+  font-size: 0.8rem;
+}
+.position-row button,
+.defaults-button {
+  border: 1px solid #79747e;
+  border-radius: 100px;
+  background: transparent;
+  color: #6750a4;
+  padding: 7px 11px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.defaults-button {
+  margin: 2px 0 10px;
 }
 .settings-grid details {
   margin-top: 22px;
@@ -653,6 +714,14 @@ progress {
 [data-theme='dark'] .connection-card,
 [data-theme='dark'] .shelf-life {
   background: #302c36;
+}
+[data-theme='dark'] .quick-options {
+  border-color: #504a57;
+}
+[data-theme='dark'] .quick-options summary,
+[data-theme='dark'] .position-row button,
+[data-theme='dark'] .defaults-button {
+  color: #d0bcff;
 }
 [data-theme='dark'] .expiry-result {
   color: #d0bcff;

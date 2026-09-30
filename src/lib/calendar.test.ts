@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { dateElementText, formatDate, shiftedLocalDate } from './calendar';
+import {
+  dateElementText,
+  formatDate,
+  localDateInput,
+  parseLocalDateInput,
+  shiftedLocalDate,
+} from './calendar';
 import type { DateElement } from './model';
 
 describe('calendar labels', () => {
@@ -26,5 +32,12 @@ describe('calendar labels', () => {
     } as DateElement;
     expect(dateElementText(element, new Date(2026, 8, 29), 'en')).toBe('Use by: 2026-10-01');
     expect(formatDate(new Date(2026, 8, 29), 'short', 'ru')).toBe('29.09.2026');
+  });
+  it('uses local calendar dates for a manually selected day', () => {
+    const selected = parseLocalDateInput('2024-02-29');
+    expect(selected).not.toBeNull();
+    expect(localDateInput(selected!)).toBe('2024-02-29');
+    expect(localDateInput(shiftedLocalDate(selected!, 1, 0, 0))).toBe('2025-02-28');
+    expect(parseLocalDateInput('2025-02-29')).toBeNull();
   });
 });

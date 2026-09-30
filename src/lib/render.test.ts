@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { canvasToRows, wrapText } from './render';
+import { describe, expect, it, vi } from 'vitest';
+import { newTemplate } from './model';
+import { canvasToRows, overflowIds, wrapText } from './render';
 
 describe('label raster', () => {
   it('wraps a long product name within the element width', () => {
@@ -23,5 +24,25 @@ describe('label raster', () => {
     expect(rows[0]).toHaveLength(48);
     expect(rows[0][0]).toBe(0b10000001);
     expect(rows[0][1]).toBe(0b00000010);
+  });
+
+  it('allows text to overlap a frame but detects actual canvas overflow', () => {
+    vi.stubGlobal('document', {
+      createElement: () => ({
+        getContext: () => ({ measureText: (value: string) => ({ width: value.length * 10 }) }),
+      }),
+    });
+    try {
+      const template = newTemplate();
+      template.elements = [template.elements[0]];
+      template.elements[0].y = 34;
+      expect(overflowIds(template, 'Название продукта', new Date(2026, 8, 30), 'ru')).toEqual([]);
+      template.elements[0].x = 100;
+      expect(overflowIds(template, 'Название продукта', new Date(2026, 8, 30), 'ru')).toEqual([
+        template.elements[0].id,
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

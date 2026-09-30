@@ -213,10 +213,10 @@ export function overflowIds(
     .filter((element) => {
       const box = elementBox(ctx, element, product, now, language);
       return (
-        box.x < 32 ||
-        box.y < 56 ||
-        box.x + box.width > PRINT_WIDTH - 32 ||
-        box.y + box.height > template.height - 28
+        box.x < 0 ||
+        box.y < 0 ||
+        box.x + box.width > PRINT_WIDTH ||
+        box.y + box.height > template.height
       );
     })
     .map((element) => element.id);

@@ -12,6 +12,12 @@ export const strings = {
     shelfLife: 'Срок годности',
     shelfMonths: 'Месяцев',
     shelfDays: 'Дней',
+    quickOptions: 'Дата, срок годности и копии',
+    customDate: 'Выбрать другую дату',
+    baseDate: 'Дата на этикетке',
+    useShelfLife: 'Указать срок годности',
+    multipleCopies: 'Несколько копий',
+    invalidDate: 'Выберите корректную дату.',
     expiryDate: 'Годен до',
     expiryHint: 'Дата окончания появится на этикетке при печати.',
     editorSample:
@@ -19,7 +25,8 @@ export const strings = {
     preview: 'Предпросмотр',
     print: 'Напечатать',
     connect: 'Подключить принтер',
-    reconnect: 'Подключить снова',
+    reconnect: 'Переподключить принтер',
+    chooseAnother: 'Выбрать другой',
     notSupported:
       'Для печати нужен Chrome или Edge с Web Bluetooth на Android либо компьютере. Редактором можно пользоваться и без Bluetooth.',
     secure: 'Откройте приложение по HTTPS или на localhost.',
@@ -59,6 +66,12 @@ export const strings = {
     addProduct: '+ Название',
     addText: '+ Текст',
     addDate: '+ Дата',
+    addExpiry: '+ Годен до',
+    position: 'Положение блока на этикетке',
+    positionHorizontal: 'По горизонтали',
+    positionVertical: 'По вертикали',
+    top: 'Сверху',
+    bottom: 'Снизу',
     element: 'Элемент',
     text: 'Текст',
     prefix: 'Подпись',
@@ -81,19 +94,19 @@ export const strings = {
     width: 'Ширина, точки',
     removeElement: 'Удалить элемент',
     selectElement: 'Коснитесь текста на макете для настройки или перетащите его.',
-    overflow:
-      'Некоторые элементы выходят за безопасную область. Перед печатью исправьте их положение.',
+    overflow: 'Некоторые элементы выходят за границы этикетки. Исправьте их положение.',
+    mx10Defaults: 'Применить значения MX10',
     saved: 'Сохранено',
     imported: 'Резервная копия импортирована',
     localData:
       'Шаблоны хранятся только в этом браузере. Экспортируйте резервную копию перед очисткой данных или сменой телефона.',
     calibration:
-      'Калибровка MX10: начните с пробной печати. Если верхний или нижний край обрезан, измените число пустых строк. Для слишком светлой печати увеличьте плотность. Зарядите принтер перед длинной печатью.',
+      'Калибровка MX10: начните с пробной печати. Если верхний или нижний край обрезан, измените число пустых строк. При бледной печати проверьте ленту и заряд. Зарядите принтер перед длинной печатью.',
     compatible:
       'Профиль рассчитан на MX10 (384 точки). Похожие модели могут работать, но пока не проверены.',
     repo: 'Исходный код и документация',
     dateInfo:
-      'Дата берётся с устройства в момент печати. Сначала применяются годы и месяцы с ограничением до конца месяца, затем дни.',
+      'По умолчанию дата берётся с устройства в момент печати; на странице печати можно выбрать другую. Сначала применяются годы и месяцы с ограничением до конца месяца, затем дни.',
     frame_none: 'Без рамки',
     frame_classic: 'Классическая',
     frame_jar: 'Банка',
@@ -107,6 +120,8 @@ export const strings = {
     errorName: 'Введите название продукта.',
     errorPrinter: 'Подключите принтер.',
     printDone: 'Задание отправлено на принтер.',
+    printRecovery:
+      'Проверьте состояние и заряд принтера, затем переподключите его. Если часть этикетки уже вышла, повторите печать вручную.',
     emptyTemplates: 'Шаблонов пока нет.',
   },
   en: {
@@ -122,6 +137,12 @@ export const strings = {
     shelfLife: 'Shelf life',
     shelfMonths: 'Months',
     shelfDays: 'Days',
+    quickOptions: 'Date, shelf life and copies',
+    customDate: 'Choose another date',
+    baseDate: 'Date on label',
+    useShelfLife: 'Set shelf life',
+    multipleCopies: 'Multiple copies',
+    invalidDate: 'Choose a valid date.',
     expiryDate: 'Best before',
     expiryHint: 'The expiry date will be added to the printed label.',
     editorSample:
@@ -129,7 +150,8 @@ export const strings = {
     preview: 'Preview',
     print: 'Print',
     connect: 'Connect printer',
-    reconnect: 'Reconnect',
+    reconnect: 'Reconnect printer',
+    chooseAnother: 'Choose another',
     notSupported:
       'Printing requires Chrome or Edge with Web Bluetooth on Android or desktop. You can still edit labels without Bluetooth.',
     secure: 'Open the app via HTTPS or localhost.',
@@ -169,6 +191,12 @@ export const strings = {
     addProduct: '+ Product',
     addText: '+ Text',
     addDate: '+ Date',
+    addExpiry: '+ Best before',
+    position: 'Position on label',
+    positionHorizontal: 'Horizontal',
+    positionVertical: 'Vertical',
+    top: 'Top',
+    bottom: 'Bottom',
     element: 'Element',
     text: 'Text',
     prefix: 'Prefix',
@@ -191,18 +219,19 @@ export const strings = {
     width: 'Width, dots',
     removeElement: 'Remove element',
     selectElement: 'Tap text on the label to edit or drag it.',
-    overflow: 'Some elements are outside the safe area. Move them before printing.',
+    overflow: 'Some elements are outside the label. Move them before printing.',
+    mx10Defaults: 'Apply MX10 defaults',
     saved: 'Saved',
     imported: 'Backup imported',
     localData:
       'Templates stay in this browser. Export a backup before clearing browser data or changing phones.',
     calibration:
-      'MX10 calibration: start with a test print. Adjust blank rows if edges are clipped. Increase density if the print is too light. Charge the printer before long jobs.',
+      'MX10 calibration: start with a test print. Adjust blank rows if edges are clipped. Check the paper and battery if the print is too light. Charge the printer before long jobs.',
     compatible:
       'This profile is tuned for MX10 (384 dots). Similar models may work but are not yet verified.',
     repo: 'Source code and documentation',
     dateInfo:
-      'The date comes from this device at print time. Year and month offsets clamp to month end; day offset is applied last.',
+      'The date normally comes from this device at print time; you can choose another on the print screen. Year and month offsets clamp to month end; day offset is applied last.',
     frame_none: 'None',
     frame_classic: 'Classic',
     frame_jar: 'Jar',
@@ -216,6 +245,8 @@ export const strings = {
     errorName: 'Enter a product name.',
     errorPrinter: 'Connect a printer.',
     printDone: 'Job sent to printer.',
+    printRecovery:
+      'Check the printer and battery, then reconnect it. If part of the label has already printed, retry manually.',
     emptyTemplates: 'No templates yet.',
   },
 } as const;

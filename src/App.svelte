@@ -2,10 +2,18 @@
   import { onMount } from 'svelte';
   import NavIcon from './NavIcon.svelte';
   import { strings } from './lib/i18n';
-  import { formatDate, localDayKey, shiftedLocalDate } from './lib/calendar';
+  import {
+    formatDate,
+    localDateInput,
+    localDayKey,
+    parseLocalDateInput,
+    shiftedLocalDate,
+  } from './lib/calendar';
   import { withExpiry } from './lib/quick-label';
   import {
     DOTS_PER_MM,
+    PRINT_WIDTH,
+    defaultPrinterSettings,
     duplicateTemplate,
     initialWorkspace,
     newTemplate,
@@ -53,6 +61,10 @@
   let productName = '';
   let shelfLifeMonths = 0;
   let shelfLifeDays = 0;
+  let useShelfLife = false;
+  let useCustomDate = false;
+  let customDate = localDateInput(new Date());
+  let useMultipleCopies = false;
   let copies = 1;
   let now = new Date();
   let printerName = '';
@@ -63,6 +75,7 @@
   let previewCanvas: HTMLCanvasElement;
   let importInput: HTMLInputElement;
   let saveTimer: ReturnType<typeof setTimeout>;
+  let messageTimer: ReturnType<typeof setTimeout>;
   const readyFonts = new Set<string>();
   const previewRender: { canvas?: HTMLCanvasElement; signature: string; frame: number } = {
     signature: '',
@@ -77,19 +90,28 @@
   $: selectedTemplate =
     workspace.templates.find((item) => item.id === workspace.selectedTemplateId) ??
     workspace.templates[0];
-  $: quickTemplate = selectedTemplate
-    ? withExpiry(selectedTemplate, shelfLifeMonths, shelfLifeDays, now, workspace.language)
-    : null;
+  $: quickDate = useCustomDate ? parseLocalDateInput(customDate) : now;
+  $: quickTemplate =
+    selectedTemplate && quickDate
+      ? withExpiry(
+          selectedTemplate,
+          useShelfLife ? shelfLifeMonths : 0,
+          useShelfLife ? shelfLifeDays : 0,
+          quickDate,
+          workspace.language,
+        )
+      : null;
   $: activeTemplate = tab === 'editor' ? editingTemplate : quickTemplate;
+  $: previewDate = tab === 'editor' ? now : (quickDate ?? now);
   $: previewProduct = tab === 'editor' ? '' : productName;
   $: selectedElement = editingTemplate?.elements.find((item) => item.id === selectedElementId);
   $: overflow = activeTemplate
-    ? overflowIds(activeTemplate, previewProduct, now, workspace.language)
+    ? overflowIds(activeTemplate, previewProduct, previewDate, workspace.language)
     : [];
   $: {
     activeTemplate;
     previewProduct;
-    now;
+    previewDate;
     workspace.language;
     selectedElementId;
     previewCanvas;
@@ -102,7 +124,7 @@
       tab,
       template: activeTemplate,
       previewProduct,
-      day: localDayKey(now),
+      day: localDayKey(previewDate),
       language: workspace.language,
       selectedElementId,
     });
@@ -138,7 +160,18 @@
   onMount(() => {
     const themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
     const refreshTheme = () => setDocumentTheme(workspace.theme);
+    const handleVisibility = () => {
+      if (document.hidden) printer.onPageHidden();
+      else now = new Date();
+    };
+    const handlePageHide = () => printer.onPageHidden();
+    const handlePageShow = () => {
+      now = new Date();
+    };
     themeMedia.addEventListener('change', refreshTheme);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
     loadWorkspace()
       .then((data) => {
         workspace = data;
@@ -161,15 +194,19 @@
     return () => {
       clearInterval(timer);
       clearTimeout(saveTimer);
+      clearTimeout(messageTimer);
       cancelAnimationFrame(previewRender.frame);
       themeMedia.removeEventListener('change', refreshTheme);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
       printer.disconnect();
     };
   });
 
   function drawPreview() {
     if (!previewCanvas || !activeTemplate) return;
-    const image = renderLabel(activeTemplate, previewProduct, now, workspace.language);
+    const image = renderLabel(activeTemplate, previewProduct, previewDate, workspace.language);
     previewCanvas.width = image.width;
     previewCanvas.height = image.height;
     previewCanvas.getContext('2d')!.drawImage(image, 0, 0);
@@ -194,6 +231,11 @@
         }),
       300,
     );
+  }
+  function showMessage(value: string) {
+    clearTimeout(messageTimer);
+    message = value;
+    messageTimer = setTimeout(() => (message = ''), 4000);
   }
   function changeWorkspace(fn: (data: Workspace) => void) {
     const next = structuredClone(workspace);
@@ -242,14 +284,14 @@
     });
     editingTemplate = null;
     tab = 'templates';
-    message = t.saved;
+    showMessage(t.saved);
   }
-  function addElement(type: LabelElement['type']) {
+  function addElement(type: LabelElement['type'], source: 'today' | 'expiry' = 'today') {
     if (!editingTemplate) return;
     const base = {
       id: crypto.randomUUID(),
       x: 44,
-      y: Math.min(editingTemplate.height - 65, 140),
+      y: Math.min(editingTemplate.height - 65, source === 'expiry' ? 260 : 140),
       width: 296,
       style: {
         fontFamily: 'Noto Sans' as FontFamily,
@@ -266,8 +308,13 @@
           : {
               ...base,
               type,
-              source: 'today',
-              prefix: '',
+              source,
+              prefix:
+                source === 'expiry'
+                  ? workspace.language === 'ru'
+                    ? 'Годен до: '
+                    : 'Best before: '
+                  : '',
               format: 'short',
               offsetDays: 0,
               offsetMonths: 0,
@@ -275,6 +322,22 @@
             };
     changeEditor((data) => data.elements.push(item));
     selectedElementId = item.id;
+  }
+  function positionElement(axis: 'x' | 'y', side: 'start' | 'center' | 'end') {
+    if (!selectedElement || !editingTemplate) return;
+    const ctx = previewCanvas?.getContext('2d');
+    if (!ctx) return;
+    const box = elementBox(ctx, selectedElement, '', now, workspace.language);
+    const limit = axis === 'x' ? PRINT_WIDTH - box.width : editingTemplate.height - box.height;
+    const value = Math.round(side === 'start' ? 0 : side === 'center' ? limit / 2 : limit);
+    changeElement((item) => {
+      item[axis] = Math.max(0, value);
+    });
+  }
+  function snap(value: number, limit: number): number {
+    const candidates = [0, limit / 2, limit];
+    const target = candidates.find((point) => Math.abs(point - value) <= 8);
+    return Math.round(Math.max(0, Math.min(limit, target ?? value)));
   }
   function onPointerDown(event: PointerEvent) {
     if (tab !== 'editor' || !editingTemplate || !previewCanvas) return;
@@ -305,13 +368,11 @@
     const rect = previewCanvas.getBoundingClientRect();
     const x = ((event.clientX - rect.left) * previewCanvas.width) / rect.width;
     const y = ((event.clientY - rect.top) * previewCanvas.height) / rect.height;
-    const nextX = num(String(dragging.x + x - dragging.startX), dragging.x, 0, 384);
-    const nextY = num(
-      String(dragging.y + y - dragging.startY),
-      dragging.y,
-      0,
-      editingTemplate.height,
-    );
+    const element = editingTemplate.elements.find((item) => item.id === selectedElementId);
+    if (!element) return;
+    const box = elementBox(previewCanvas.getContext('2d')!, element, '', now, workspace.language);
+    const nextX = snap(dragging.x + x - dragging.startX, PRINT_WIDTH - box.width);
+    const nextY = snap(dragging.y + y - dragging.startY, editingTemplate.height - box.height);
     changeElement((item) => {
       item.x = nextX;
       item.y = nextY;
@@ -320,11 +381,11 @@
   function onPointerUp(event: PointerEvent) {
     if (dragging?.pointerId === event.pointerId) dragging = null;
   }
-  async function choosePrinter() {
+  async function choosePrinter(changeDevice = false) {
     error = '';
     message = '';
     try {
-      printerName = await printer.choose();
+      printerName = changeDevice ? await printer.choose() : await printer.reconnect();
     } catch (e) {
       if ((e as Error).name !== 'NotFoundError') error = String(e);
     }
@@ -346,10 +407,21 @@
     }
     const freshNow = new Date();
     now = freshNow;
+    const printDate = includeExpiry && useCustomDate ? parseLocalDateInput(customDate) : freshNow;
+    if (!printDate) {
+      error = t.invalidDate;
+      return;
+    }
     const printTemplate = includeExpiry
-      ? withExpiry(template, shelfLifeMonths, shelfLifeDays, freshNow, workspace.language)
+      ? withExpiry(
+          template,
+          useShelfLife ? shelfLifeMonths : 0,
+          useShelfLife ? shelfLifeDays : 0,
+          printDate,
+          workspace.language,
+        )
       : template;
-    if (overflowIds(printTemplate, product, freshNow, workspace.language).length) {
+    if (overflowIds(printTemplate, product, printDate, workspace.language).length) {
       error = t.overflow;
       return;
     }
@@ -358,11 +430,11 @@
     progress = 0;
     try {
       await ensureFonts(printTemplate);
-      const rows = canvasToRows(renderLabel(printTemplate, product, freshNow, workspace.language));
+      const rows = canvasToRows(renderLabel(printTemplate, product, printDate, workspace.language));
       await printer.print(rows, workspace.printer, count);
-      message = t.printDone;
+      showMessage(t.printDone);
     } catch (e) {
-      error = String(e);
+      error = `${String(e)} ${t.printRecovery}`;
     }
   }
   function testPrint() {
@@ -386,7 +458,7 @@
       const data = parseWorkspace(JSON.parse(await file.text()));
       workspace = data;
       await saveWorkspace(data);
-      message = t.imported;
+      showMessage(t.imported);
       error = '';
     } catch (e) {
       error = String(e);
@@ -407,7 +479,9 @@
 
 <div class="shell">
   <aside class="rail" aria-label="Navigation">
-    <div class="rail-brand"><span class="brand-mark">▤</span><strong>Thermal Print</strong></div>
+    <div class="rail-brand">
+      <span class="brand-mark"><NavIcon kind="print" /></span><strong>Thermal Print</strong>
+    </div>
     <nav>
       <button class:active={tab === 'quick'} onclick={() => (tab = 'quick')}
         ><NavIcon kind="print" /> <span>{t.quick}</span></button
@@ -426,7 +500,7 @@
   <div class="main-wrap">
     <header class="topbar">
       <div class="mobile-brand">
-        <span class="brand-mark">▤</span><strong>Thermal Print</strong>
+        <span class="brand-mark"><NavIcon kind="print" /></span><strong>Thermal Print</strong>
       </div>
       <div class="page-title">
         <h1>{tab === 'editor' ? t.edit : tab === 'printer' ? t.settingsNav : t[tab]}</h1>
@@ -481,48 +555,68 @@
                 bind:value={productName}
               /></label
             >
-            <div class="shelf-life">
-              <h3>{t.shelfLife}</h3>
-              <div class="two-fields">
-                <label
-                  >{t.shelfMonths}<input
-                    type="number"
-                    min="0"
-                    max="120"
-                    value={shelfLifeMonths}
-                    oninput={(e) => (shelfLifeMonths = num(e.currentTarget.value, 0, 0, 120))}
-                  /></label
-                >
-                <label
-                  >{t.shelfDays}<input
-                    type="number"
-                    min="0"
-                    max="3650"
-                    value={shelfLifeDays}
-                    oninput={(e) => (shelfLifeDays = num(e.currentTarget.value, 0, 0, 3650))}
-                  /></label
-                >
-              </div>
-              {#if shelfLifeMonths > 0 || shelfLifeDays > 0}
-                <p class="expiry-result">
-                  {t.expiryDate}: {formatDate(
-                    shiftedLocalDate(now, 0, shelfLifeMonths, shelfLifeDays),
-                    'short',
-                    workspace.language,
-                  )}
-                </p>
-                <p class="helper">{t.expiryHint}</p>
+            <details class="quick-options">
+              <summary>{t.quickOptions}</summary>
+              <label class="checkbox-label"
+                ><input
+                  type="checkbox"
+                  checked={useCustomDate}
+                  onchange={(e) => {
+                    useCustomDate = e.currentTarget.checked;
+                    if (useCustomDate) customDate = localDateInput(new Date());
+                  }}
+                />{t.customDate}</label
+              >
+              {#if useCustomDate}<label
+                  >{t.baseDate}<input type="date" bind:value={customDate} /></label
+                >{/if}
+              <label class="checkbox-label"
+                ><input type="checkbox" bind:checked={useShelfLife} />{t.useShelfLife}</label
+              >
+              {#if useShelfLife}
+                <div class="two-fields">
+                  <label
+                    >{t.shelfMonths}<input
+                      type="number"
+                      min="0"
+                      max="120"
+                      value={shelfLifeMonths}
+                      oninput={(e) => (shelfLifeMonths = num(e.currentTarget.value, 0, 0, 120))}
+                    /></label
+                  >
+                  <label
+                    >{t.shelfDays}<input
+                      type="number"
+                      min="0"
+                      max="3650"
+                      value={shelfLifeDays}
+                      oninput={(e) => (shelfLifeDays = num(e.currentTarget.value, 0, 0, 3650))}
+                    /></label
+                  >
+                </div>
+                {#if quickDate && (shelfLifeMonths > 0 || shelfLifeDays > 0)}
+                  <p class="expiry-result">
+                    {t.expiryDate}: {formatDate(
+                      shiftedLocalDate(quickDate, 0, shelfLifeMonths, shelfLifeDays),
+                      'short',
+                      workspace.language,
+                    )}
+                  </p>
+                {/if}
               {/if}
-            </div>
-            <label
-              >{t.copies}<input
-                type="number"
-                min="1"
-                max="20"
-                value={copies}
-                oninput={(e) => (copies = num(e.currentTarget.value, 1, 1, 20))}
-              /></label
-            >
+              <label class="checkbox-label"
+                ><input type="checkbox" bind:checked={useMultipleCopies} />{t.multipleCopies}</label
+              >
+              {#if useMultipleCopies}<label
+                  >{t.copies}<input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={copies}
+                    oninput={(e) => (copies = num(e.currentTarget.value, 1, 1, 20))}
+                  /></label
+                >{/if}
+            </details>
             <div class="connection-line">
               <span class:online={printerStatus === 'connected'} class="status-dot"></span>
               <span>{printerName || t.noPrinter}</span>
@@ -531,16 +625,29 @@
                 {window.isSecureContext ? t.notSupported : t.secure}
               </p>{/if}
             <div class="action-stack">
-              {#if !printer.device}<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-                <md-outlined-button onclick={choosePrinter} disabled={!BlePrinter.supported()}
-                  >{t.connect}</md-outlined-button
-                >{/if}
+              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+              <md-outlined-button
+                onclick={() => choosePrinter()}
+                disabled={!BlePrinter.supported() ||
+                  printerStatus === 'printing' ||
+                  printerStatus === 'connecting'}
+                >{printer.device ? t.reconnect : t.connect}</md-outlined-button
+              >
               <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
               <md-filled-button
                 onclick={() =>
-                  selectedTemplate && void sendPrint(selectedTemplate, productName, copies, true)}
-                disabled={printerStatus === 'printing' || !selectedTemplate || overflow.length > 0}
-                >{t.print}</md-filled-button
+                  selectedTemplate &&
+                  void sendPrint(
+                    selectedTemplate,
+                    productName,
+                    useMultipleCopies ? copies : 1,
+                    true,
+                  )}
+                disabled={printerStatus === 'printing' ||
+                  printerStatus === 'connecting' ||
+                  !quickDate ||
+                  !selectedTemplate ||
+                  overflow.length > 0}>{t.print}</md-filled-button
               >
             </div>
             {#if printerStatus === 'printing'}<progress max="1" value={progress}></progress>{/if}
@@ -690,6 +797,10 @@
               <md-outlined-button onclick={() => addElement('text')}>{t.addText}</md-outlined-button
               ><!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
               <md-outlined-button onclick={() => addElement('date')}>{t.addDate}</md-outlined-button
+              >
+              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+              <md-outlined-button onclick={() => addElement('date', 'expiry')}
+                >{t.addExpiry}</md-outlined-button
               >
             </div>
             <p class="helper">{t.selectElement}</p>
@@ -871,6 +982,33 @@
                     /></label
                   >
                 </div>
+                <div class="position-controls">
+                  <h4>{t.position}</h4>
+                  <div class="position-row">
+                    <span>{t.positionHorizontal}</span>
+                    <button type="button" onclick={() => positionElement('x', 'start')}
+                      >{t.left}</button
+                    >
+                    <button type="button" onclick={() => positionElement('x', 'center')}
+                      >{t.center}</button
+                    >
+                    <button type="button" onclick={() => positionElement('x', 'end')}
+                      >{t.right}</button
+                    >
+                  </div>
+                  <div class="position-row">
+                    <span>{t.positionVertical}</span>
+                    <button type="button" onclick={() => positionElement('y', 'start')}
+                      >{t.top}</button
+                    >
+                    <button type="button" onclick={() => positionElement('y', 'center')}
+                      >{t.center}</button
+                    >
+                    <button type="button" onclick={() => positionElement('y', 'end')}
+                      >{t.bottom}</button
+                    >
+                  </div>
+                </div>
                 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                 <md-text-button
                   onclick={() => {
@@ -923,13 +1061,23 @@
             {#if !BlePrinter.supported()}<p class="helper warning">
                 {window.isSecureContext ? t.notSupported : t.secure}
               </p>{/if}
-            <div class="button-row">
+            <div class="button-row wrap">
               <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
               <md-filled-button
-                onclick={choosePrinter}
-                disabled={!BlePrinter.supported() || printerStatus === 'printing'}
-                >{t.connect}</md-filled-button
+                onclick={() => choosePrinter()}
+                disabled={!BlePrinter.supported() ||
+                  printerStatus === 'printing' ||
+                  printerStatus === 'connecting'}
+                >{printer.device ? t.reconnect : t.connect}</md-filled-button
               >
+              {#if printer.device}
+                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                <md-outlined-button
+                  onclick={() => choosePrinter(true)}
+                  disabled={printerStatus === 'printing' || printerStatus === 'connecting'}
+                  >{t.chooseAnother}</md-outlined-button
+                >
+              {/if}
               <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
               <md-outlined-button
                 onclick={testPrint}
@@ -998,6 +1146,16 @@
                 value={workspace.printer.postFeed}
                 onchange={(e) => setPrinterNumber('postFeed', e.currentTarget.value, 0, 256)}
               /></label
+            >
+            <button
+              class="defaults-button"
+              type="button"
+              onclick={() =>
+                changeWorkspace((data) => {
+                  data.printer.energy = defaultPrinterSettings.energy;
+                  data.printer.preFeed = defaultPrinterSettings.preFeed;
+                  data.printer.postFeed = defaultPrinterSettings.postFeed;
+                })}>{t.mx10Defaults}</button
             >
             <details>
               <summary>{t.advanced}</summary><label
