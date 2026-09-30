@@ -9,7 +9,10 @@ export type Frame =
   | 'dots'
   | 'bottle'
   | 'freezer'
-  | 'ribbon';
+  | 'ribbon'
+  | 'stripes'
+  | 'waves'
+  | 'corners';
 export type FontFamily =
   'Noto Sans' | 'Noto Serif' | 'Roboto Condensed' | 'Montserrat' | 'Caveat' | 'monospace';
 export type Theme = 'light' | 'dark' | 'system';

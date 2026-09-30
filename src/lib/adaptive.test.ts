@@ -36,6 +36,7 @@ describe('adaptive system template', () => {
       true,
     );
     expect(bothDates.elements.at(-1)).toMatchObject({ text: 'Годен до: 28.02.2025' });
+    expect(dated.elements[1].y - (dated.elements[0].y + Math.ceil(50 * 1.22))).toBe(4);
     for (const template of [oneLine, twoLines, dated, bothDates])
       expect(template.height % 8).toBe(0);
   });

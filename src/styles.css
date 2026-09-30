@@ -140,14 +140,35 @@ md-filled-tonal-button {
 .mobile-brand {
   display: none;
 }
-.language-switch select {
-  width: auto;
-  min-width: 68px;
-  padding: 10px 12px;
-  border-radius: 100px;
-  background: #fff;
+.header-printer-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border: 1px solid #c8c4cf;
+  border-radius: 100px;
+  padding: 9px 12px;
+  background: #fff;
   color: #343038;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.header-printer-status .status-dot {
+  flex: none;
+}
+.status-label-short {
+  display: none;
+}
+@media (max-width: 380px) {
+  .header-printer-status {
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  .status-label-full {
+    display: none;
+  }
+  .status-label-short {
+    display: inline;
+  }
 }
 .main-wrap main {
   padding: 10px clamp(20px, 4vw, 56px) 60px;
@@ -281,15 +302,30 @@ md-filled-tonal-button {
 .quick-options .two-fields label {
   margin-bottom: 8px;
 }
-.adaptive-settings {
-  border-bottom: 1px solid #e8e4eb;
-  margin-bottom: 14px;
-  padding-bottom: 3px;
+.adaptive-config {
+  border-top: 1px solid #e8e4eb;
+  margin-top: 8px;
+  padding-top: 12px;
 }
-.adaptive-settings-title {
+.adaptive-config summary {
+  color: #6750a4;
+  cursor: pointer;
   font-size: 0.88rem;
   font-weight: 700;
-  margin: 8px 0 12px;
+}
+.adaptive-settings {
+  padding-top: 16px;
+}
+.template-card .adaptive-settings .checkbox-label {
+  padding-top: 0;
+  margin-bottom: 12px;
+}
+.controls textarea {
+  field-sizing: content;
+  min-height: 46px;
+  max-height: 140px;
+  overflow-y: auto;
+  resize: vertical;
 }
 .quick-options .expiry-result {
   margin: 2px 0 14px;
@@ -759,7 +795,7 @@ progress {
 [data-theme='dark'] .panel input:not([type='checkbox']):not([type='range']),
 [data-theme='dark'] .panel select,
 [data-theme='dark'] .panel textarea,
-[data-theme='dark'] .language-switch select {
+[data-theme='dark'] .header-printer-status {
   background: #302c36;
   border-color: #706978;
   color: #f2edf5;
@@ -772,12 +808,16 @@ progress {
   border-color: #504a57;
 }
 [data-theme='dark'] .quick-options summary,
+[data-theme='dark'] .adaptive-config summary,
 [data-theme='dark'] .position-row button,
 [data-theme='dark'] .defaults-button {
   color: #d0bcff;
 }
 [data-theme='dark'] .expiry-result {
   color: #d0bcff;
+}
+[data-theme='dark'] .adaptive-config {
+  border-color: #504a57;
 }
 [data-theme='dark'] .size-pill,
 [data-theme='dark'] .template-thumb {

@@ -74,5 +74,11 @@ describe('backup validation', () => {
     if (source.templates[0].elements[1].type === 'date')
       source.templates[0].elements[1].source = 'expiry';
     expect(parseWorkspace(source)).toEqual(source);
+    for (const frame of ['stripes', 'waves', 'corners'] as const) {
+      source.templates[0].frame = frame;
+      source.adaptive.frame = frame;
+      expect(parseWorkspace(source).templates[0].frame).toBe(frame);
+      expect(parseWorkspace(source).adaptive.frame).toBe(frame);
+    }
   });
 });

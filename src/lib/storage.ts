@@ -72,6 +72,9 @@ const frames = [
   'bottle',
   'freezer',
   'ribbon',
+  'stripes',
+  'waves',
+  'corners',
 ];
 const fonts = ['Noto Sans', 'Noto Serif', 'Roboto Condensed', 'Montserrat', 'Caveat', 'monospace'];
 const aligns = ['left', 'center', 'right'];

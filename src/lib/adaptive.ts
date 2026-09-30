@@ -39,7 +39,11 @@ export function adaptiveTemplate(
   } = options;
   const frame = settings.frameEnabled ? settings.frame : 'none';
   const side = settings.frameEnabled ? 24 : 8;
-  const top = settings.frameEnabled ? (['bag', 'bottle', 'freezer'].includes(frame) ? 64 : 24) : 12;
+  const top = settings.frameEnabled
+    ? ['jar', 'container', 'bag', 'leaves', 'bottle', 'freezer', 'ribbon'].includes(frame)
+      ? 64
+      : 24
+    : 12;
   const width = PRINT_WIDTH - side * 2;
   const productLineHeight = Math.ceil(settings.fontSize * 1.22);
   context.font = `${settings.bold ? 700 : 400} ${settings.fontSize}px "${settings.fontFamily}"`;
@@ -81,7 +85,7 @@ export function adaptiveTemplate(
     addDate(
       'adaptive-date',
       `${language === 'ru' ? 'Дата: ' : 'Date: '}${formatDate(baseDate, 'short', language)}`,
-      12,
+      4,
     );
   }
   if (shelfLifeMonths > 0 || shelfLifeDays > 0) {
@@ -89,7 +93,7 @@ export function adaptiveTemplate(
     addDate(
       'adaptive-expiry',
       `${language === 'ru' ? 'Годен до: ' : 'Best before: '}${formatDate(expiry, 'short', language)}`,
-      showProductionDate ? 8 : 12,
+      showProductionDate ? 6 : 4,
     );
   }
 

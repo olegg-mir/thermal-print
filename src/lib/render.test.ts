@@ -11,6 +11,14 @@ describe('label raster', () => {
     expect(lines.join(' ')).toBe('Homemade strawberry jam');
   });
 
+  it('keeps manual product line breaks when text also wraps automatically', () => {
+    const context = { measureText: (text: string) => ({ width: text.length * 10 }) };
+    expect(wrapText(context as CanvasRenderingContext2D, 'Сыр\nФета', 100)).toEqual([
+      'Сыр',
+      'Фета',
+    ]);
+  });
+
   it('packs black pixels LSB-first into 48 bytes', () => {
     const pixels = new Uint8ClampedArray(384 * 4).fill(255);
     for (const x of [0, 7, 9]) pixels.fill(0, x * 4, x * 4 + 3);

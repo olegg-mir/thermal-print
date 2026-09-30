@@ -192,6 +192,42 @@ function drawFrame(ctx: CanvasRenderingContext2D, template: LabelTemplate): void
         ctx.stroke();
       }
     }
+  } else if (template.frame === 'stripes') {
+    ctx.lineWidth = 2;
+    for (const y of [10, 16, 22, h - 22, h - 16, h - 10]) {
+      ctx.beginPath();
+      ctx.moveTo(14, y);
+      ctx.lineTo(370, y);
+      ctx.stroke();
+    }
+  } else if (template.frame === 'waves') {
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 16; x <= 368; x += 4) {
+      const y = 16 + 3 * Math.sin(((x - 16) * Math.PI) / 16);
+      if (x === 16) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    for (let y = 20; y <= h - 16; y += 4)
+      ctx.lineTo(368 + 3 * Math.sin(((y - 16) * Math.PI) / 16), y);
+    for (let x = 364; x >= 16; x -= 4)
+      ctx.lineTo(x, h - 16 + 3 * Math.sin(((x - 16) * Math.PI) / 16));
+    for (let y = h - 20; y >= 16; y -= 4)
+      ctx.lineTo(16 + 3 * Math.sin(((y - 16) * Math.PI) / 16), y);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (template.frame === 'corners') {
+    ctx.lineWidth = 3;
+    for (const x of [14, 370])
+      for (const y of [14, h - 14]) {
+        const dx = x < 192 ? 1 : -1;
+        const dy = y < h / 2 ? 1 : -1;
+        ctx.beginPath();
+        ctx.moveTo(x, y + dy * 30);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x + dx * 46, y);
+        ctx.stroke();
+      }
   }
 }
 

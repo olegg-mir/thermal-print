@@ -56,6 +56,9 @@
     'bottle',
     'freezer',
     'ribbon',
+    'stripes',
+    'waves',
+    'corners',
   ];
   const fonts: FontFamily[] = [
     'Noto Sans',
@@ -654,18 +657,17 @@
         <h1>{tab === 'editor' ? t.edit : tab === 'printer' ? t.settingsNav : t[tab]}</h1>
         <p>{t.subtitle}</p>
       </div>
-      <label class="language-switch"
-        ><span class="sr-only">Language</span>
-        <select
-          value={workspace.language}
-          onchange={(e) =>
-            changeWorkspace(
-              (data) => (data.language = e.currentTarget.value === 'en' ? 'en' : 'ru'),
-            )}
-        >
-          <option value="ru">RU</option><option value="en">EN</option>
-        </select>
-      </label>
+      <button
+        class="header-printer-status"
+        type="button"
+        onclick={() => (tab = 'printer')}
+        aria-label={`${t.connection}: ${t[`status_${printerStatus}`]}`}
+        title={printerName || t.noPrinter}
+      >
+        <span class:online={printerStatus === 'connected'} class="status-dot"></span>
+        <span class="status-label-full">{t[`status_${printerStatus}`]}</span>
+        <span class="status-label-short">{t[`status_${printerStatus}_short`]}</span>
+      </button>
     </header>
 
     <main>
@@ -697,82 +699,15 @@
               </select></label
             >
             <label
-              >{t.product}<input
-                type="text"
+              >{t.product}<textarea
+                rows="1"
                 maxlength="200"
                 placeholder={t.product}
-                bind:value={productName}
-              /></label
+                bind:value={productName}></textarea></label
             >
             <details class="quick-options" bind:open={quickOptionsOpen}>
               <summary>{t.quickOptions}</summary>
               {#if isAdaptive}
-                <div class="adaptive-settings">
-                  <p class="adaptive-settings-title">{t.adaptiveStyle}</p>
-                  <div class="two-fields">
-                    <label
-                      >{t.font}<select
-                        value={workspace.adaptive.fontFamily}
-                        onchange={(e) =>
-                          changeWorkspace(
-                            (data) =>
-                              (data.adaptive.fontFamily = e.currentTarget.value as FontFamily),
-                          )}
-                        >{#each fonts as font}<option value={font}>{font}</option>{/each}</select
-                      ></label
-                    >
-                    <label
-                      >{t.adaptiveFontSize}<input
-                        type="number"
-                        min="16"
-                        max="96"
-                        step="1"
-                        value={workspace.adaptive.fontSize}
-                        oninput={(e) =>
-                          changeWorkspace(
-                            (data) =>
-                              (data.adaptive.fontSize = num(e.currentTarget.value, 50, 16, 96)),
-                          )}
-                      /></label
-                    >
-                  </div>
-                  <label class="checkbox-label"
-                    ><input
-                      type="checkbox"
-                      checked={workspace.adaptive.bold}
-                      onchange={(e) =>
-                        changeWorkspace((data) => (data.adaptive.bold = e.currentTarget.checked))}
-                    />{t.adaptiveBold}</label
-                  >
-                  <label class="checkbox-label"
-                    ><input
-                      type="checkbox"
-                      checked={workspace.adaptive.frameEnabled}
-                      onchange={(e) =>
-                        changeWorkspace(
-                          (data) => (data.adaptive.frameEnabled = e.currentTarget.checked),
-                        )}
-                    />{t.adaptiveFrame}</label
-                  >
-                  {#if workspace.adaptive.frameEnabled}
-                    <label
-                      >{t.frame}<select
-                        value={workspace.adaptive.frame}
-                        onchange={(e) =>
-                          changeWorkspace(
-                            (data) =>
-                              (data.adaptive.frame = e.currentTarget.value as Exclude<
-                                Frame,
-                                'none'
-                              >),
-                          )}
-                        >{#each frames.filter((frame) => frame !== 'none') as frame}<option
-                            value={frame}>{t[`frame_${frame}`]}</option
-                          >{/each}</select
-                      ></label
-                    >
-                  {/if}
-                </div>
                 <label class="checkbox-label"
                   ><input
                     type="checkbox"
@@ -946,6 +881,74 @@
                   }}>{t.quick}</md-text-button
                 >
               </div>
+              <details class="adaptive-config">
+                <summary>{t.adaptiveCustomize}</summary>
+                <div class="adaptive-settings">
+                  <div class="two-fields">
+                    <label
+                      >{t.font}<select
+                        value={workspace.adaptive.fontFamily}
+                        onchange={(e) =>
+                          changeWorkspace(
+                            (data) =>
+                              (data.adaptive.fontFamily = e.currentTarget.value as FontFamily),
+                          )}
+                        >{#each fonts as font}<option value={font}>{font}</option>{/each}</select
+                      ></label
+                    >
+                    <label
+                      >{t.adaptiveFontSize}<input
+                        type="number"
+                        min="16"
+                        max="96"
+                        step="1"
+                        value={workspace.adaptive.fontSize}
+                        oninput={(e) =>
+                          changeWorkspace(
+                            (data) =>
+                              (data.adaptive.fontSize = num(e.currentTarget.value, 50, 16, 96)),
+                          )}
+                      /></label
+                    >
+                  </div>
+                  <label class="checkbox-label"
+                    ><input
+                      type="checkbox"
+                      checked={workspace.adaptive.bold}
+                      onchange={(e) =>
+                        changeWorkspace((data) => (data.adaptive.bold = e.currentTarget.checked))}
+                    />{t.adaptiveBold}</label
+                  >
+                  <label class="checkbox-label"
+                    ><input
+                      type="checkbox"
+                      checked={workspace.adaptive.frameEnabled}
+                      onchange={(e) =>
+                        changeWorkspace(
+                          (data) => (data.adaptive.frameEnabled = e.currentTarget.checked),
+                        )}
+                    />{t.adaptiveFrame}</label
+                  >
+                  {#if workspace.adaptive.frameEnabled}
+                    <label
+                      >{t.frame}<select
+                        value={workspace.adaptive.frame}
+                        onchange={(e) =>
+                          changeWorkspace(
+                            (data) =>
+                              (data.adaptive.frame = e.currentTarget.value as Exclude<
+                                Frame,
+                                'none'
+                              >),
+                          )}
+                        >{#each frames.filter((frame) => frame !== 'none') as frame}<option
+                            value={frame}>{t[`frame_${frame}`]}</option
+                          >{/each}</select
+                      ></label
+                    >
+                  {/if}
+                </div>
+              </details>
             </article>
             {#each workspace.templates as item}
               <article class="template-card">
@@ -1468,6 +1471,17 @@
           <section class="panel about-panel">
             <span class="eyebrow">Thermal Print</span>
             <h2>{t.appearance}</h2>
+            <label
+              >{t.language}<select
+                value={workspace.language}
+                onchange={(e) =>
+                  changeWorkspace(
+                    (data) => (data.language = e.currentTarget.value === 'en' ? 'en' : 'ru'),
+                  )}
+              >
+                <option value="ru">Русский</option><option value="en">English</option>
+              </select></label
+            >
             <label
               >{t.theme}<select
                 value={workspace.theme}
