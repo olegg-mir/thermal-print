@@ -8,6 +8,31 @@ export interface ElementBox {
   height: number;
 }
 
+export interface RenderViewport {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export function editorViewport(
+  template: LabelTemplate,
+  product: string,
+  now: Date,
+  language: Language,
+): RenderViewport {
+  const ctx = document.createElement('canvas').getContext('2d')!;
+  const viewport = { left: -16, top: -16, right: PRINT_WIDTH + 16, bottom: template.height + 16 };
+  for (const element of template.elements) {
+    const box = elementBox(ctx, element, product, now, language);
+    viewport.left = Math.min(viewport.left, Math.floor(box.x - 16));
+    viewport.top = Math.min(viewport.top, Math.floor(box.y - 16));
+    viewport.right = Math.max(viewport.right, Math.ceil(box.x + box.width + 16));
+    viewport.bottom = Math.max(viewport.bottom, Math.ceil(box.y + box.height + 16));
+  }
+  return viewport;
+}
+
 function textFor(element: LabelElement, product: string, now: Date, language: Language): string {
   if (element.type === 'product')
     return product.trim() || (language === 'ru' ? 'Название продукта' : 'Product name');
@@ -175,13 +200,19 @@ export function renderLabel(
   product: string,
   now: Date,
   language: Language,
+  viewport?: RenderViewport,
 ): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
-  canvas.width = PRINT_WIDTH;
-  canvas.height = template.height;
+  const area = viewport ?? { left: 0, top: 0, right: PRINT_WIDTH, bottom: template.height };
+  canvas.width = area.right - area.left;
+  canvas.height = area.bottom - area.top;
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = viewport ? '#eee9f4' : '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(-area.left, -area.top);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, PRINT_WIDTH, template.height);
   ctx.fillStyle = '#000';
   drawFrame(ctx, template);
   for (const element of template.elements) {
@@ -198,6 +229,15 @@ export function renderLabel(
             : element.x;
       ctx.fillText(line, x, element.y + lineHeight * index);
     });
+  }
+  ctx.restore();
+  if (viewport) {
+    ctx.save();
+    ctx.strokeStyle = '#6750a4';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 5]);
+    ctx.strokeRect(-area.left, -area.top, PRINT_WIDTH, template.height);
+    ctx.restore();
   }
   return canvas;
 }

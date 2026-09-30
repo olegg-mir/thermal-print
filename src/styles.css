@@ -340,6 +340,36 @@ md-filled-tonal-button {
 .preview-panel {
   min-width: 0;
 }
+.preview-column {
+  min-width: 0;
+}
+.history-panel .section-heading {
+  margin-bottom: 4px;
+}
+.history-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+.history-row {
+  display: grid;
+  gap: 3px;
+  text-align: left;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid #e8e4eb;
+  border-radius: 14px;
+  background: #fdfbff;
+  color: #1d1b20;
+}
+.history-row:hover,
+.history-row:focus-visible {
+  border-color: #6750a4;
+}
+.history-row span {
+  font-size: 0.77rem;
+  color: #6b6570;
+}
 .size-pill {
   color: #6750a4;
   background: #eee6f8;
@@ -372,6 +402,11 @@ md-filled-tonal-button {
 .editor-stage canvas {
   touch-action: none;
   cursor: grab;
+  background: transparent;
+  box-shadow: none;
+}
+.editor-stage {
+  max-height: 70vh;
 }
 .editor-stage canvas:active {
   cursor: grabbing;
@@ -696,6 +731,14 @@ progress {
   background: #24212b;
   border-color: #3e3946;
   box-shadow: none;
+}
+[data-theme='dark'] .history-row {
+  background: #302c36;
+  border-color: #504a57;
+  color: #f2edf5;
+}
+[data-theme='dark'] .history-row span {
+  color: #c9c3ce;
 }
 [data-theme='dark'] .panel label,
 [data-theme='dark'] .element-editor label,

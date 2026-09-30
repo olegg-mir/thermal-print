@@ -9,9 +9,39 @@ describe('backup validation', () => {
   });
   it('rejects unknown versions and invalid printer settings', () => {
     const source = initialWorkspace();
-    expect(() => parseWorkspace({ ...source, version: 2 })).toThrow();
+    expect(() => parseWorkspace({ ...source, version: 3 })).toThrow();
     expect(() =>
       parseWorkspace({ ...source, printer: { ...source.printer, packetSize: 1000 } }),
+    ).toThrow();
+  });
+  it('migrates version 1 templates and validates a bounded print history', () => {
+    const source = initialWorkspace();
+    const old = { ...source, version: 1 } as Record<string, unknown>;
+    delete old.history;
+    expect(parseWorkspace(old)).toMatchObject({
+      version: 2,
+      history: [],
+      templates: source.templates,
+    });
+    source.history = [
+      {
+        id: 'job-1',
+        printedAt: '2026-09-30T10:00:00.000Z',
+        templateId: source.templates[0].id,
+        product: 'Томаты',
+        baseDate: '2026-09-30',
+        shelfLifeMonths: 1,
+        shelfLifeDays: 0,
+        copies: 2,
+        showProductionDate: true,
+      },
+    ];
+    expect(parseWorkspace(source).history).toEqual(source.history);
+    expect(() =>
+      parseWorkspace({ ...source, history: [{ ...source.history[0], baseDate: '2026-02-30' }] }),
+    ).toThrow();
+    expect(() =>
+      parseWorkspace({ ...source, history: Array(11).fill(source.history[0]) }),
     ).toThrow();
   });
   it('rejects malformed date rules', () => {

@@ -1,4 +1,10 @@
-import { defaultPrinterSettings, initialWorkspace, type Workspace } from './model';
+import { parseLocalDateInput } from './calendar';
+import {
+  ADAPTIVE_TEMPLATE_ID,
+  defaultPrinterSettings,
+  initialWorkspace,
+  type Workspace,
+} from './model';
 
 const DB_NAME = 'thermal-print';
 const STORE = 'data';
@@ -72,7 +78,7 @@ const formats = ['short', 'shortYear', 'iso', 'long'];
 export function parseWorkspace(value: unknown): Workspace {
   if (
     !object(value) ||
-    value.version !== 1 ||
+    (value.version !== 1 && value.version !== 2) ||
     !Array.isArray(value.templates) ||
     value.templates.length === 0 ||
     value.templates.length > 100 ||
@@ -141,15 +147,40 @@ export function parseWorkspace(value: unknown): Workspace {
     throw new Error('Invalid printer settings');
   const selectedTemplateId =
     typeof value.selectedTemplateId === 'string' ? value.selectedTemplateId : '';
+  const historyRaw = value.version === 1 ? [] : value.history;
+  if (!Array.isArray(historyRaw) || historyRaw.length > 10)
+    throw new Error('Invalid print history');
+  const history = historyRaw.map((raw) => {
+    if (
+      !object(raw) ||
+      typeof raw.id !== 'string' ||
+      typeof raw.printedAt !== 'string' ||
+      !Number.isFinite(Date.parse(raw.printedAt)) ||
+      typeof raw.templateId !== 'string' ||
+      typeof raw.product !== 'string' ||
+      raw.product.length > 200 ||
+      typeof raw.baseDate !== 'string' ||
+      !parseLocalDateInput(raw.baseDate) ||
+      !number(raw.shelfLifeMonths, 0, 120) ||
+      !number(raw.shelfLifeDays, 0, 3650) ||
+      !number(raw.copies, 1, 20) ||
+      typeof raw.showProductionDate !== 'boolean'
+    )
+      throw new Error('Invalid print history entry');
+    return raw;
+  }) as unknown as Workspace['history'];
   return {
-    version: 1,
+    version: 2,
     language: value.language === 'en' ? 'en' : 'ru',
     theme: value.theme === 'dark' || value.theme === 'system' ? value.theme : 'light',
-    selectedTemplateId: templates.some((t) => t.id === selectedTemplateId)
-      ? selectedTemplateId
-      : (templates[0]?.id ?? ''),
+    selectedTemplateId:
+      selectedTemplateId === ADAPTIVE_TEMPLATE_ID ||
+      templates.some((t) => t.id === selectedTemplateId)
+        ? selectedTemplateId
+        : (templates[0]?.id ?? ''),
     templates,
     printer: { ...defaultPrinterSettings, ...printer } as Workspace['printer'],
+    history,
   };
 }
 

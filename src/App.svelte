@@ -10,7 +10,9 @@
     shiftedLocalDate,
   } from './lib/calendar';
   import { withExpiry } from './lib/quick-label';
+  import { adaptiveTemplate } from './lib/adaptive';
   import {
+    ADAPTIVE_TEMPLATE_ID,
     DOTS_PER_MM,
     PRINT_WIDTH,
     defaultPrinterSettings,
@@ -25,10 +27,18 @@
     type LabelElement,
     type LabelTemplate,
     type PrinterSettings,
+    type PrintHistoryEntry,
     type Theme,
     type Workspace,
   } from './lib/model';
-  import { canvasToRows, elementBox, overflowIds, renderLabel } from './lib/render';
+  import {
+    canvasToRows,
+    editorViewport,
+    elementBox,
+    overflowIds,
+    renderLabel,
+    type RenderViewport,
+  } from './lib/render';
   import { exportWorkspace, loadWorkspace, parseWorkspace, saveWorkspace } from './lib/storage';
   import { BlePrinter, type PrinterStatus } from './lib/printer/ble';
 
@@ -65,6 +75,8 @@
   let useCustomDate = false;
   let customDate = localDateInput(new Date());
   let useMultipleCopies = false;
+  let showProductionDate = true;
+  let quickOptionsOpen = false;
   let copies = 1;
   let now = new Date();
   let printerName = '';
@@ -83,23 +95,36 @@
   };
   let dragging: { pointerId: number; startX: number; startY: number; x: number; y: number } | null =
     null;
+  let previewViewport: RenderViewport = { left: 0, top: 0, right: PRINT_WIDTH, bottom: 320 };
 
   $: t = strings[workspace.language];
   $: if (typeof document !== 'undefined') document.documentElement.lang = workspace.language;
   $: if (typeof document !== 'undefined') setDocumentTheme(workspace.theme);
-  $: selectedTemplate =
-    workspace.templates.find((item) => item.id === workspace.selectedTemplateId) ??
-    workspace.templates[0];
   $: quickDate = useCustomDate ? parseLocalDateInput(customDate) : now;
-  $: quickTemplate =
-    selectedTemplate && quickDate
-      ? withExpiry(
-          selectedTemplate,
+  $: isAdaptive = workspace.selectedTemplateId === ADAPTIVE_TEMPLATE_ID;
+  $: selectedTemplate =
+    isAdaptive && quickDate
+      ? makeAdaptiveTemplate(
+          productName,
+          quickDate,
+          showProductionDate,
           useShelfLife ? shelfLifeMonths : 0,
           useShelfLife ? shelfLifeDays : 0,
-          quickDate,
           workspace.language,
         )
+      : (workspace.templates.find((item) => item.id === workspace.selectedTemplateId) ??
+        workspace.templates[0]);
+  $: quickTemplate =
+    selectedTemplate && quickDate
+      ? isAdaptive
+        ? selectedTemplate
+        : withExpiry(
+            selectedTemplate,
+            useShelfLife ? shelfLifeMonths : 0,
+            useShelfLife ? shelfLifeDays : 0,
+            quickDate,
+            workspace.language,
+          )
       : null;
   $: activeTemplate = tab === 'editor' ? editingTemplate : quickTemplate;
   $: previewDate = tab === 'editor' ? now : (quickDate ?? now);
@@ -142,6 +167,28 @@
 
   function fontSpec(element: LabelElement): string {
     return `${element.style.bold ? 700 : 400} ${element.style.fontSize}px "${element.style.fontFamily}"`;
+  }
+
+  function makeAdaptiveTemplate(
+    product: string,
+    date: Date,
+    showDate: boolean,
+    months: number,
+    days: number,
+    language: Workspace['language'],
+  ): LabelTemplate {
+    const ctx = document.createElement('canvas').getContext('2d')!;
+    return adaptiveTemplate(
+      {
+        product,
+        baseDate: date,
+        showProductionDate: showDate,
+        shelfLifeMonths: months,
+        shelfLifeDays: days,
+        language,
+      },
+      ctx,
+    );
   }
 
   function setDocumentTheme(theme: Theme): void {
@@ -206,7 +253,25 @@
 
   function drawPreview() {
     if (!previewCanvas || !activeTemplate) return;
-    const image = renderLabel(activeTemplate, previewProduct, previewDate, workspace.language);
+    const viewport =
+      tab === 'editor'
+        ? dragging
+          ? previewViewport
+          : editorViewport(activeTemplate, previewProduct, previewDate, workspace.language)
+        : undefined;
+    previewViewport = viewport ?? {
+      left: 0,
+      top: 0,
+      right: PRINT_WIDTH,
+      bottom: activeTemplate.height,
+    };
+    const image = renderLabel(
+      activeTemplate,
+      previewProduct,
+      previewDate,
+      workspace.language,
+      viewport,
+    );
     previewCanvas.width = image.width;
     previewCanvas.height = image.height;
     previewCanvas.getContext('2d')!.drawImage(image, 0, 0);
@@ -217,7 +282,12 @@
       ctx.strokeStyle = '#6750a4';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
-      ctx.strokeRect(box.x - 3, box.y - 3, box.width + 6, box.height + 6);
+      ctx.strokeRect(
+        box.x - previewViewport.left - 3,
+        box.y - previewViewport.top - 3,
+        box.width + 6,
+        box.height + 6,
+      );
       ctx.restore();
     }
   }
@@ -295,7 +365,7 @@
       width: 296,
       style: {
         fontFamily: 'Noto Sans' as FontFamily,
-        fontSize: 22,
+        fontSize: type === 'date' ? 20 : 22,
         bold: false,
         align: 'center' as Align,
       },
@@ -342,8 +412,10 @@
   function onPointerDown(event: PointerEvent) {
     if (tab !== 'editor' || !editingTemplate || !previewCanvas) return;
     const rect = previewCanvas.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) * previewCanvas.width) / rect.width;
-    const y = ((event.clientY - rect.top) * previewCanvas.height) / rect.height;
+    const x =
+      previewViewport.left + ((event.clientX - rect.left) * previewCanvas.width) / rect.width;
+    const y =
+      previewViewport.top + ((event.clientY - rect.top) * previewCanvas.height) / rect.height;
     const ctx = previewCanvas.getContext('2d')!;
     const found = [...editingTemplate.elements].reverse().find((item) => {
       const box = elementBox(ctx, item, previewProduct, now, workspace.language);
@@ -366,8 +438,10 @@
     if (!dragging || dragging.pointerId !== event.pointerId || !previewCanvas || !editingTemplate)
       return;
     const rect = previewCanvas.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) * previewCanvas.width) / rect.width;
-    const y = ((event.clientY - rect.top) * previewCanvas.height) / rect.height;
+    const x =
+      previewViewport.left + ((event.clientX - rect.left) * previewCanvas.width) / rect.width;
+    const y =
+      previewViewport.top + ((event.clientY - rect.top) * previewCanvas.height) / rect.height;
     const element = editingTemplate.elements.find((item) => item.id === selectedElementId);
     if (!element) return;
     const box = elementBox(previewCanvas.getContext('2d')!, element, '', now, workspace.language);
@@ -379,7 +453,10 @@
     });
   }
   function onPointerUp(event: PointerEvent) {
-    if (dragging?.pointerId === event.pointerId) dragging = null;
+    if (dragging?.pointerId === event.pointerId) {
+      dragging = null;
+      drawPreview();
+    }
   }
   async function choosePrinter(changeDevice = false) {
     error = '';
@@ -412,30 +489,83 @@
       error = t.invalidDate;
       return;
     }
-    const printTemplate = includeExpiry
-      ? withExpiry(
-          template,
-          useShelfLife ? shelfLifeMonths : 0,
-          useShelfLife ? shelfLifeDays : 0,
-          printDate,
-          workspace.language,
-        )
-      : template;
-    if (overflowIds(printTemplate, product, printDate, workspace.language).length) {
-      error = t.overflow;
-      return;
-    }
     error = '';
     message = '';
     progress = 0;
     try {
+      if (template.id === ADAPTIVE_TEMPLATE_ID) {
+        await document.fonts.load('700 50px "Noto Sans"', product);
+      }
+      const printTemplate =
+        template.id === ADAPTIVE_TEMPLATE_ID
+          ? makeAdaptiveTemplate(
+              product,
+              printDate,
+              showProductionDate,
+              useShelfLife ? shelfLifeMonths : 0,
+              useShelfLife ? shelfLifeDays : 0,
+              workspace.language,
+            )
+          : includeExpiry
+            ? withExpiry(
+                template,
+                useShelfLife ? shelfLifeMonths : 0,
+                useShelfLife ? shelfLifeDays : 0,
+                printDate,
+                workspace.language,
+              )
+            : template;
       await ensureFonts(printTemplate);
       const rows = canvasToRows(renderLabel(printTemplate, product, printDate, workspace.language));
       await printer.print(rows, workspace.printer, count);
+      if (includeExpiry) {
+        const entry: PrintHistoryEntry = {
+          id: crypto.randomUUID(),
+          printedAt: new Date().toISOString(),
+          templateId: template.id,
+          product,
+          baseDate: localDateInput(printDate),
+          shelfLifeMonths: useShelfLife ? shelfLifeMonths : 0,
+          shelfLifeDays: useShelfLife ? shelfLifeDays : 0,
+          copies: count,
+          showProductionDate,
+        };
+        changeWorkspace((data) => {
+          data.history = [entry, ...data.history].slice(0, 10);
+        });
+        clearTimeout(saveTimer);
+        try {
+          await saveWorkspace(workspace);
+        } catch (saveError) {
+          error = `${t.historySaveError} ${String(saveError)}`;
+        }
+      }
       showMessage(t.printDone);
     } catch (e) {
       error = `${String(e)} ${t.printRecovery}`;
     }
+  }
+  function restoreHistory(entry: PrintHistoryEntry) {
+    productName = entry.product;
+    useCustomDate = true;
+    customDate = entry.baseDate;
+    shelfLifeMonths = entry.shelfLifeMonths;
+    shelfLifeDays = entry.shelfLifeDays;
+    useShelfLife = shelfLifeMonths > 0 || shelfLifeDays > 0;
+    copies = entry.copies;
+    useMultipleCopies = entry.copies > 1;
+    showProductionDate = entry.showProductionDate;
+    quickOptionsOpen = true;
+    if (
+      entry.templateId === ADAPTIVE_TEMPLATE_ID ||
+      workspace.templates.some((item) => item.id === entry.templateId)
+    ) {
+      changeWorkspace((data) => {
+        data.selectedTemplateId = entry.templateId;
+      });
+    }
+    tab = 'quick';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   function testPrint() {
     const template = newTemplate('MX10 test', workspace.language);
@@ -543,6 +673,7 @@
                 onchange={(e) =>
                   changeWorkspace((data) => (data.selectedTemplateId = e.currentTarget.value))}
               >
+                <option value={ADAPTIVE_TEMPLATE_ID}>{t.adaptiveTemplate}</option>
                 {#each workspace.templates as item}<option value={item.id}>{item.name}</option
                   >{/each}
               </select></label
@@ -555,8 +686,14 @@
                 bind:value={productName}
               /></label
             >
-            <details class="quick-options">
+            <details class="quick-options" bind:open={quickOptionsOpen}>
               <summary>{t.quickOptions}</summary>
+              {#if isAdaptive}<label class="checkbox-label"
+                  ><input
+                    type="checkbox"
+                    bind:checked={showProductionDate}
+                  />{t.showProductionDate}</label
+                >{/if}
               <label class="checkbox-label"
                 ><input
                   type="checkbox"
@@ -646,27 +783,56 @@
                 disabled={printerStatus === 'printing' ||
                   printerStatus === 'connecting' ||
                   !quickDate ||
-                  !selectedTemplate ||
-                  overflow.length > 0}>{t.print}</md-filled-button
+                  !selectedTemplate}>{t.print}</md-filled-button
               >
             </div>
             {#if printerStatus === 'printing'}<progress max="1" value={progress}></progress>{/if}
           </section>
-          <section class="panel preview-panel">
-            <div class="section-heading">
-              <div>
-                <span class="eyebrow">02 / {t.preview}</span>
-                <h2>{t.preview}</h2>
+          <div class="preview-column">
+            <section class="panel preview-panel">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">02 / {t.preview}</span>
+                  <h2>{t.preview}</h2>
+                </div>
+                {#if quickTemplate}<span class="size-pill"
+                    >48 × {Math.round(quickTemplate.height / DOTS_PER_MM)} mm</span
+                  >{/if}
               </div>
-              {#if quickTemplate}<span class="size-pill"
-                  >48 × {Math.round(quickTemplate.height / DOTS_PER_MM)} mm</span
-                >{/if}
-            </div>
-            <div class="preview-stage">
-              <canvas bind:this={previewCanvas} aria-label={t.preview}></canvas>
-            </div>
-            {#if overflow.length}<p class="helper warning">{t.overflow}</p>{/if}
-          </section>
+              <div class="preview-stage">
+                <canvas bind:this={previewCanvas} aria-label={t.preview}></canvas>
+              </div>
+              {#if overflow.length}<p class="helper warning">{t.overflow}</p>{/if}
+            </section>
+            {#if workspace.history.length}
+              <section class="panel history-panel">
+                <div class="section-heading">
+                  <div>
+                    <span class="eyebrow">{t.recentLabels}</span>
+                    <h2>{t.recentLabels}</h2>
+                  </div>
+                </div>
+                <p class="helper">{t.historyHint}</p>
+                <div class="history-list">
+                  {#each workspace.history as entry (entry.id)}
+                    <button type="button" class="history-row" onclick={() => restoreHistory(entry)}>
+                      <strong>{entry.product}</strong>
+                      <span
+                        >{formatDate(
+                          parseLocalDateInput(entry.baseDate) ?? new Date(),
+                          'short',
+                          workspace.language,
+                        )} · {entry.templateId === ADAPTIVE_TEMPLATE_ID
+                          ? t.adaptiveTemplate
+                          : (workspace.templates.find((item) => item.id === entry.templateId)
+                              ?.name ?? t.template)} · {entry.copies}×</span
+                      >
+                    </button>
+                  {/each}
+                </div>
+              </section>
+            {/if}
+          </div>
         </div>
       {:else if tab === 'templates'}
         <section class="panel">
@@ -679,6 +845,22 @@
             <md-filled-button onclick={() => startEditor()}>{t.newTemplate}</md-filled-button>
           </div>
           <div class="template-grid">
+            <article class="template-card system-template">
+              <div class="template-thumb">Aa</div>
+              <div>
+                <h3>{t.adaptiveTemplate}</h3>
+                <p>{t.adaptiveDescription}</p>
+              </div>
+              <div class="card-actions">
+                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                <md-text-button
+                  onclick={() => {
+                    changeWorkspace((data) => (data.selectedTemplateId = ADAPTIVE_TEMPLATE_ID));
+                    tab = 'quick';
+                  }}>{t.quick}</md-text-button
+                >
+              </div>
+            </article>
             {#each workspace.templates as item}
               <article class="template-card">
                 <div class="template-thumb">
@@ -804,6 +986,25 @@
               >
             </div>
             <p class="helper">{t.selectElement}</p>
+            <label class="element-picker"
+              >{t.selectBlock}<select
+                value={selectedElementId}
+                onchange={(e) => (selectedElementId = e.currentTarget.value)}
+              >
+                <option value="">{t.selectBlock}</option>
+                {#each editingTemplate.elements as item}
+                  <option value={item.id}
+                    >{item.type === 'product'
+                      ? t.product
+                      : item.type === 'date'
+                        ? item.source === 'expiry'
+                          ? t.dateExpiry
+                          : t.dateToday
+                        : item.text.slice(0, 24)}</option
+                  >
+                {/each}
+              </select></label
+            >
             {#if selectedElement}
               <div class="element-editor">
                 <h3>{t.element}: {selectedElement.type}</h3>

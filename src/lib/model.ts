@@ -67,17 +67,31 @@ export interface PrinterSettings {
   packetDelay: number;
 }
 
+export interface PrintHistoryEntry {
+  id: string;
+  printedAt: string;
+  templateId: string;
+  product: string;
+  baseDate: string;
+  shelfLifeMonths: number;
+  shelfLifeDays: number;
+  copies: number;
+  showProductionDate: boolean;
+}
+
 export interface Workspace {
-  version: 1;
+  version: 2;
   language: Language;
   theme: Theme;
   selectedTemplateId: string;
   templates: LabelTemplate[];
   printer: PrinterSettings;
+  history: PrintHistoryEntry[];
 }
 
 export const PRINT_WIDTH = 384;
 export const DOTS_PER_MM = 8;
+export const ADAPTIVE_TEMPLATE_ID = 'system-adaptive';
 
 export const defaultPrinterSettings: PrinterSettings = {
   energy: 65535,
@@ -125,12 +139,13 @@ export function newTemplate(name = 'Продукт', language: Language = 'ru'):
 export function initialWorkspace(): Workspace {
   const template = newTemplate();
   return {
-    version: 1,
+    version: 2,
     language: 'ru',
     theme: 'light',
     selectedTemplateId: template.id,
     templates: [template],
     printer: { ...defaultPrinterSettings },
+    history: [],
   };
 }
 

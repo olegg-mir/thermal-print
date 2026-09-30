@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { newTemplate } from './model';
-import { canvasToRows, overflowIds, wrapText } from './render';
+import { canvasToRows, editorViewport, overflowIds, wrapText } from './render';
 
 describe('label raster', () => {
   it('wraps a long product name within the element width', () => {
@@ -41,6 +41,26 @@ describe('label raster', () => {
       expect(overflowIds(template, 'Название продукта', new Date(2026, 8, 30), 'ru')).toEqual([
         template.elements[0].id,
       ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps elements visible in the editor when tape length is reduced', () => {
+    vi.stubGlobal('document', {
+      createElement: () => ({
+        getContext: () => ({ measureText: (value: string) => ({ width: value.length * 10 }) }),
+      }),
+    });
+    try {
+      const template = newTemplate();
+      template.height = 160;
+      const view = editorViewport(template, '', new Date(2026, 8, 30), 'ru');
+      expect(view.bottom).toBeGreaterThan(template.elements[1].y);
+      expect(view.bottom).toBeGreaterThan(template.height);
+      expect(overflowIds(template, '', new Date(2026, 8, 30), 'ru')).toContain(
+        template.elements[1].id,
+      );
     } finally {
       vi.unstubAllGlobals();
     }
