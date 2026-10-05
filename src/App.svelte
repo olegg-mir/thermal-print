@@ -506,12 +506,20 @@
     error = '';
     message = '';
     progress = 0;
+    const adaptiveSettings = { ...workspace.adaptive };
     try {
       if (template.id === ADAPTIVE_TEMPLATE_ID) {
-        await document.fonts.load(
-          `${workspace.adaptive.bold ? 700 : 400} ${workspace.adaptive.fontSize}px "${workspace.adaptive.fontFamily}"`,
-          product,
-        );
+        const settings = adaptiveSettings;
+        await Promise.all([
+          document.fonts.load(
+            `${settings.bold ? 700 : 400} ${settings.fontSize}px "${settings.fontFamily}"`,
+            product,
+          ),
+          document.fonts.load(
+            `${settings.dateBold ? 700 : 400} ${settings.dateFontSize}px "${settings.dateFontFamily}"`,
+            'Дата Годен до Date Best before 0123456789',
+          ),
+        ]);
       }
       const printTemplate =
         template.id === ADAPTIVE_TEMPLATE_ID
@@ -522,7 +530,7 @@
               useShelfLife ? shelfLifeMonths : 0,
               useShelfLife ? shelfLifeDays : 0,
               workspace.language,
-              workspace.adaptive,
+              adaptiveSettings,
             )
           : includeExpiry
             ? withExpiry(
@@ -547,7 +555,7 @@
           shelfLifeDays: useShelfLife ? shelfLifeDays : 0,
           copies: count,
           showProductionDate,
-          ...(template.id === ADAPTIVE_TEMPLATE_ID ? { adaptive: { ...workspace.adaptive } } : {}),
+          ...(template.id === ADAPTIVE_TEMPLATE_ID ? { adaptive: adaptiveSettings } : {}),
         };
         changeWorkspace((data) => {
           data.history = [entry, ...data.history].slice(0, 10);
@@ -918,6 +926,43 @@
                       onchange={(e) =>
                         changeWorkspace((data) => (data.adaptive.bold = e.currentTarget.checked))}
                     />{t.adaptiveBold}</label
+                  >
+                  <div class="two-fields">
+                    <label
+                      >{t.adaptiveDateFont}<select
+                        value={workspace.adaptive.dateFontFamily}
+                        onchange={(e) =>
+                          changeWorkspace(
+                            (data) =>
+                              (data.adaptive.dateFontFamily = e.currentTarget.value as FontFamily),
+                          )}
+                        >{#each fonts as font}<option value={font}>{font}</option>{/each}</select
+                      ></label
+                    >
+                    <label
+                      >{t.adaptiveDateSize}<input
+                        type="number"
+                        min="8"
+                        max="96"
+                        step="1"
+                        value={workspace.adaptive.dateFontSize}
+                        oninput={(e) =>
+                          changeWorkspace(
+                            (data) =>
+                              (data.adaptive.dateFontSize = num(e.currentTarget.value, 20, 8, 96)),
+                          )}
+                      /></label
+                    >
+                  </div>
+                  <label class="checkbox-label"
+                    ><input
+                      type="checkbox"
+                      checked={workspace.adaptive.dateBold}
+                      onchange={(e) =>
+                        changeWorkspace(
+                          (data) => (data.adaptive.dateBold = e.currentTarget.checked),
+                        )}
+                    />{t.adaptiveDateBold}</label
                   >
                   <label class="checkbox-label"
                     ><input

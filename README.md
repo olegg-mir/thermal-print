@@ -12,7 +12,7 @@
 - Любое число текстовых полей и дат. Каждая дата имеет подпись, формат и смещение на дни, месяцы и годы.
 - Встроенные монохромные рамки: банка, контейнер, пакет, бутылка, заморозка, лента, классическая, листья, точки, полосы, волнистая линия и уголки.
 - Дополнительные настройки на странице печати раскрываются по необходимости: можно выбрать другую дату, указать срок годности в месяцах и днях или число копий. Дата окончания рассчитывается при печати; в редакторе её можно расположить отдельным полем даты.
-- Встроенный шаблон **Адаптивный** по умолчанию печатает название жирным шрифтом 50 точек и автоматически меняет длину ленты по числу строк и включённым датам. Шрифт, размер, жирность и рамка настраиваются в разделе **Шаблоны**.
+- Встроенный шаблон **Адаптивный** по умолчанию печатает название жирным шрифтом 50 точек и автоматически меняет длину ленты по числу строк и включённым датам. Шрифт, размер, жирность и рамка настраиваются в разделе **Шаблоны**. Для обеих дат доступны общие гарнитура, размер и жирность, независимо от оформления названия.
 - Под предпросмотром хранятся 10 последних отправленных этикеток. Нажатие на запись возвращает название, выбранную дату, срок годности, число копий и шаблон.
 - На экране печати предпросмотр соответствует растровому заданию шириной **384 точки**. Редактор дополнительно показывает элементы за границей печати. Длина этикетки на непрерывной ленте настраивается.
 - Профиль печати с плотностью и скоростью, числовыми полями и ползунками, пустыми строками до и после этикетки; пробная печать для калибровки.
@@ -58,7 +58,7 @@ npm run build
 - `src/lib/adaptive.ts` — встроенный шаблон с длиной по переносу текста и включённым датам.
 - `src/lib/render.ts` — один Canvas-рендер для предпросмотра и растровой печати.
 - `src/lib/printer/` — кодирование команд MX10 и Web Bluetooth-транспорт.
-- `src/lib/storage.ts` — IndexedDB, история печати, проверка резервных копий и миграция форматов 1/2 → 3.
+- `src/lib/storage.ts` — IndexedDB, история печати, проверка резервных копий и миграция форматов 1/2/3 → 4.
 - `src/App.svelte` — интерфейс Material Design 3 на телефоне и компьютере.
 
 Печать на настоящем MX10 подтверждена пользователем. Восстановление BLE после сворачивания приложения и обработка редкого статуса `0xe` требуют повторной проверки на устройстве после обновления. Автоматические тесты покрывают даты, формат команд, импорт и сброс BLE-сессии; они не заменяют проверку на бумаге.
@@ -83,4 +83,4 @@ npm run build
 
 Thermal Print is a mobile-first, installable PWA for MX10 Bluetooth thermal printers. Build reusable product-label templates with text, dynamic dates, and monochrome frames; then enter a product name and print. Templates and printer settings are stored locally with JSON backup export/import. Printing requires Web Bluetooth in a secure context; Android Chrome is the primary target. The UI is available in Russian and English. See the sections above for development commands, architecture, hardware limitations, and source acknowledgements.
 
-The built-in Adaptive template starts with a bold 50-dot product name and shortens or lengthens the label according to wrapping and enabled dates. Its font, size, weight and optional frame are saved locally. The last 10 sent labels restore their print values and adaptive style. In the editor, off-label elements stay visible and can be moved back; they do not block printing.
+The built-in Adaptive template starts with a bold 50-dot product name and shortens or lengthens the label according to wrapping and enabled dates. Its font, size, weight and optional frame are saved locally. Both dates share separate font, size and weight settings. The last 10 sent labels restore their print values and adaptive style. In the editor, off-label elements stay visible and can be moved back; they do not block printing.

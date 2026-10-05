@@ -10,9 +10,6 @@ import {
 } from './model';
 import { wrapText } from './render';
 
-const DATE_SIZE = 20;
-const DATE_LINE_HEIGHT = Math.ceil(DATE_SIZE * 1.22);
-
 export interface AdaptiveOptions {
   product: string;
   baseDate: Date;
@@ -75,10 +72,17 @@ export function adaptiveTemplate(
       y: cursor,
       width,
       text,
-      style: { fontFamily: settings.fontFamily, fontSize: DATE_SIZE, bold: false, align: 'center' },
+      style: {
+        fontFamily: settings.dateFontFamily,
+        fontSize: settings.dateFontSize,
+        bold: settings.dateBold,
+        align: 'center',
+      },
     };
     elements.push(element);
-    cursor += DATE_LINE_HEIGHT;
+    context.font = `${settings.dateBold ? 700 : 400} ${settings.dateFontSize}px "${settings.dateFontFamily}"`;
+    cursor +=
+      Math.max(1, wrapText(context, text, width).length) * Math.ceil(settings.dateFontSize * 1.22);
   };
 
   if (showProductionDate) {

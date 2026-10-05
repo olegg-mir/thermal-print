@@ -50,6 +50,7 @@ describe('adaptive system template', () => {
         ...base,
         product: 'Очень длинное название продукта',
         settings: {
+          ...defaultAdaptiveSettings,
           fontFamily: 'Noto Serif',
           fontSize: 64,
           bold: false,
@@ -67,5 +68,38 @@ describe('adaptive system template', () => {
     });
     expect(styled.height).toBeGreaterThan(plain.height);
     expect(styled.height % 8).toBe(0);
+  });
+  it('shares date styling and reserves space for every wrapped date line', () => {
+    const measuredContext = {
+      font: '',
+      measureText(text: string) {
+        const size = Number(this.font.match(/(\d+)px/)?.[1]);
+        return { width: text.length * size * 0.6 };
+      },
+    } as CanvasRenderingContext2D;
+    const options = { ...base, product: 'Сыр', showProductionDate: true, shelfLifeDays: 7 };
+    const small = adaptiveTemplate(options, measuredContext);
+    const large = adaptiveTemplate(
+      {
+        ...options,
+        settings: {
+          ...defaultAdaptiveSettings,
+          dateFontFamily: 'Noto Serif',
+          dateFontSize: 60,
+          dateBold: true,
+        },
+      },
+      measuredContext,
+    );
+    const [product, date, expiry] = large.elements;
+    expect(product.style).toEqual(small.elements[0].style);
+    expect(date.style).toEqual(expiry.style);
+    expect(date.style).toMatchObject({ fontFamily: 'Noto Serif', fontSize: 60, bold: true });
+    expect(large.height).toBeGreaterThan(small.height);
+    // Both date strings exceed the available width at this size and occupy two lines.
+    const dateHeight = 2 * Math.ceil(60 * 1.22);
+    expect(expiry.y).toBeGreaterThanOrEqual(date.y + dateHeight);
+    expect(large.height).toBeGreaterThanOrEqual(expiry.y + dateHeight);
+    expect(large.height % 8).toBe(0);
   });
 });

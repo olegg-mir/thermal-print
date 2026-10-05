@@ -9,7 +9,7 @@ describe('backup validation', () => {
   });
   it('rejects unknown versions and invalid printer settings', () => {
     const source = initialWorkspace();
-    expect(() => parseWorkspace({ ...source, version: 4 })).toThrow();
+    expect(() => parseWorkspace({ ...source, version: 5 })).toThrow();
     expect(() =>
       parseWorkspace({ ...source, printer: { ...source.printer, packetSize: 1000 } }),
     ).toThrow();
@@ -19,7 +19,7 @@ describe('backup validation', () => {
     const old = { ...source, version: 1 } as Record<string, unknown>;
     delete old.history;
     expect(parseWorkspace(old)).toMatchObject({
-      version: 3,
+      version: 4,
       history: [],
       templates: source.templates,
       adaptive: source.adaptive,
@@ -51,6 +51,49 @@ describe('backup validation', () => {
     ).toThrow();
     expect(() =>
       parseWorkspace({ ...source, history: Array(11).fill(source.history[0]) }),
+    ).toThrow();
+  });
+  it('migrates version 3 date styles in the workspace and history', () => {
+    const source = initialWorkspace();
+    const adaptive = { ...source.adaptive, fontFamily: 'Noto Serif' } as Record<string, unknown>;
+    delete adaptive.dateFontFamily;
+    delete adaptive.dateFontSize;
+    delete adaptive.dateBold;
+    const migrated = parseWorkspace({
+      ...source,
+      version: 3,
+      adaptive,
+      history: [
+        {
+          id: 'old-job',
+          printedAt: '2026-09-30T10:00:00.000Z',
+          templateId: 'system-adaptive',
+          product: 'Сыр',
+          baseDate: '2026-09-30',
+          shelfLifeMonths: 0,
+          shelfLifeDays: 7,
+          copies: 1,
+          showProductionDate: true,
+          adaptive,
+        },
+      ],
+    });
+    expect(migrated.version).toBe(4);
+    expect(migrated.adaptive).toMatchObject({
+      dateFontFamily: 'Noto Serif',
+      dateFontSize: 20,
+      dateBold: false,
+    });
+    expect(migrated.history[0].adaptive).toEqual(migrated.adaptive);
+    source.adaptive.dateFontFamily = 'Montserrat';
+    source.adaptive.dateFontSize = 32;
+    source.adaptive.dateBold = true;
+    expect(parseWorkspace(source)).toEqual(source);
+    expect(() =>
+      parseWorkspace({ ...source, adaptive: { ...source.adaptive, dateFontSize: 200 } }),
+    ).toThrow();
+    expect(() =>
+      parseWorkspace({ ...source, adaptive: { ...source.adaptive, dateBold: undefined } }),
     ).toThrow();
   });
   it('rejects malformed date rules', () => {

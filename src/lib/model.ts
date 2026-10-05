@@ -76,6 +76,9 @@ export interface AdaptiveSettings {
   bold: boolean;
   frameEnabled: boolean;
   frame: Exclude<Frame, 'none'>;
+  dateFontFamily: FontFamily;
+  dateFontSize: number;
+  dateBold: boolean;
 }
 
 export interface PrintHistoryEntry {
@@ -92,7 +95,7 @@ export interface PrintHistoryEntry {
 }
 
 export interface Workspace {
-  version: 3;
+  version: 4;
   language: Language;
   theme: Theme;
   selectedTemplateId: string;
@@ -121,6 +124,9 @@ export const defaultAdaptiveSettings: AdaptiveSettings = {
   bold: true,
   frameEnabled: false,
   frame: 'classic',
+  dateFontFamily: 'Noto Sans',
+  dateFontSize: 20,
+  dateBold: false,
 };
 
 export function newTemplate(name = 'Продукт', language: Language = 'ru'): LabelTemplate {
@@ -160,7 +166,7 @@ export function newTemplate(name = 'Продукт', language: Language = 'ru'):
 export function initialWorkspace(): Workspace {
   const template = newTemplate();
   return {
-    version: 3,
+    version: 4,
     language: 'ru',
     theme: 'light',
     selectedTemplateId: template.id,

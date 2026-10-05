@@ -80,7 +80,7 @@ const fonts = ['Noto Sans', 'Noto Serif', 'Roboto Condensed', 'Montserrat', 'Cav
 const aligns = ['left', 'center', 'right'];
 const formats = ['short', 'shortYear', 'iso', 'long'];
 
-function parseAdaptive(value: unknown): AdaptiveSettings {
+function parseAdaptive(value: unknown, legacy = false): AdaptiveSettings {
   if (
     !object(value) ||
     !fonts.includes(String(value.fontFamily)) ||
@@ -91,13 +91,22 @@ function parseAdaptive(value: unknown): AdaptiveSettings {
     !frames.includes(String(value.frame))
   )
     throw new Error('Invalid adaptive settings');
-  return value as unknown as AdaptiveSettings;
+  const settings = legacy
+    ? { ...value, dateFontFamily: value.fontFamily, dateFontSize: 20, dateBold: false }
+    : value;
+  if (
+    !fonts.includes(String(settings.dateFontFamily)) ||
+    !number(settings.dateFontSize, 8, 96) ||
+    typeof settings.dateBold !== 'boolean'
+  )
+    throw new Error('Invalid adaptive date settings');
+  return settings as unknown as AdaptiveSettings;
 }
 
 export function parseWorkspace(value: unknown): Workspace {
   if (
     !object(value) ||
-    (value.version !== 1 && value.version !== 2 && value.version !== 3) ||
+    (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4) ||
     !Array.isArray(value.templates) ||
     value.templates.length === 0 ||
     value.templates.length > 100 ||
@@ -186,11 +195,12 @@ export function parseWorkspace(value: unknown): Workspace {
       typeof raw.showProductionDate !== 'boolean'
     )
       throw new Error('Invalid print history entry');
-    if (raw.adaptive !== undefined) parseAdaptive(raw.adaptive);
-    return raw;
+    return raw.adaptive !== undefined
+      ? { ...raw, adaptive: parseAdaptive(raw.adaptive, value.version !== 4) }
+      : raw;
   }) as unknown as Workspace['history'];
   return {
-    version: 3,
+    version: 4,
     language: value.language === 'en' ? 'en' : 'ru',
     theme: value.theme === 'dark' || value.theme === 'system' ? value.theme : 'light',
     selectedTemplateId:
@@ -200,7 +210,10 @@ export function parseWorkspace(value: unknown): Workspace {
         : (templates[0]?.id ?? ''),
     templates,
     printer: { ...defaultPrinterSettings, ...printer } as Workspace['printer'],
-    adaptive: value.version === 3 ? parseAdaptive(value.adaptive) : { ...defaultAdaptiveSettings },
+    adaptive:
+      value.version === 3 || value.version === 4
+        ? parseAdaptive(value.adaptive, value.version === 3)
+        : { ...defaultAdaptiveSettings },
     history,
   };
 }
